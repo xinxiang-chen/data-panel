@@ -1,0 +1,17 @@
+[
+  {
+    "name": "GCS_AHU5DaTemp",
+    "attributes": { "description": { "text": "Supply air Temperature, Analog Input, ºF" } },
+    "latestValue": "62.06",
+    "latestTimestamp": "2026-02-15T17:40:08.201Z",
+    "latestQuality": "QUALITY_GOOD+OK+LIMIT_OK"
+  },
+  {
+    "name": "GCS_AHU5DaRh",
+    "attributes": { "description": { "text": "Discharge Air Humidity, Analog Input, RH" } },
+    "latestValue": "61.625",
+    "latestTimestamp": "2026-02-15T17:40:08.201Z",
+    "latestQuality": "QUALITY_GOOD+OK+LIMIT_OK"
+  }
+]
+
