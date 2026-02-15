@@ -48,8 +48,7 @@ export function DashboardPage() {
   const sensorsQuery = useQuery({
     queryKey: ["sensors", selectedDeviceId],
     queryFn: () => apiGetSensors(selectedDeviceId),
-    enabled: Boolean(selectedDeviceId),
-    refetchInterval: 30_000
+    enabled: Boolean(selectedDeviceId)
   });
   const sensors = sensorsQuery.data?.sensors ?? [];
   const selectedSensorId = sensorId ?? sensors[0]?.name ?? "";
