@@ -1,7 +1,7 @@
 'use client'
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { formatDateForDisplay } from '@/lib/dateUtils'
+import { formatDateShortTime } from '@/lib/dateUtils'
 
 interface VisualizationEngineProps {
   data: any[]
@@ -17,7 +17,7 @@ export function VisualizationEngine({ data, sensorId }: VisualizationEngineProps
   const chartData = data.map((point: any) => {
     const timestamp = point.startTime || point.timestamp
     return {
-      timestamp: formatDateForDisplay(timestamp),
+      timestamp: formatDateShortTime(timestamp),
       value: point.value || point.avg || 0,
       raw: point,
     }

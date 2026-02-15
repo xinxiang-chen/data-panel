@@ -32,10 +32,12 @@ export function formatDateForDisplay(date: Date | string): string {
 }
 
 /**
- * Format date as short date string (MM/dd/yyyy)
+ * Format date as short date-time string (MMM DD, HH:mm)
+ * Example: "Feb 15, 17:38"
  */
-export function formatDateShort(date: Date): string {
-  return format(date, 'MM/dd/yyyy')
+export function formatDateShortTime(date: Date | string): string {
+  const d = typeof date === 'string' ? parseAPIDate(date) : date
+  return format(d, 'MMM dd, HH:mm')
 }
 
 /**

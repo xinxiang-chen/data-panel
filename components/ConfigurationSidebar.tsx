@@ -38,13 +38,19 @@ export function ConfigurationSidebar({
   const [devices, setDevices] = useState<any[]>([])
   const [sensors, setSensors] = useState<any[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
+  const [deviceSearchOpen, setDeviceSearchOpen] = useState(false)
+  const [deviceSearchTerm, setDeviceSearchTerm] = useState('')
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const [localSelectedDevice, setLocalSelectedDevice] = useState<string | null>(selectedDevice)
 
   // Load devices on mount
   useEffect(() => {
     const loadDevices = async () => {
       try {
         const data = await fetchSensorData('getAllDevices', {})
-        setDevices(data)
+        // Sort devices alphabetically by name
+        const sortedDevices = data.sort((a: any, b: any) => a.name.localeCompare(b.name))
+        setDevices(sortedDevices)
       } catch (err) {
         onError('Failed to load devices')
       } finally {
@@ -73,6 +79,73 @@ export function ConfigurationSidebar({
     }
     loadSensors()
   }, [selectedDevice, onError])
+
+  // Filter devices based on search term
+  const filteredDevices = devices.filter((device: any) =>
+    device.name.toLowerCase().includes(deviceSearchTerm.toLowerCase())
+  )
+
+  // Keep a local selected device in sync with prop so UI updates immediately
+  useEffect(() => {
+    setLocalSelectedDevice(selectedDevice)
+  }, [selectedDevice])
+
+  // Get selected device name (prefer local state)
+  const selectedDeviceName = devices.find((d: any) => d.id === localSelectedDevice)?.name || ''
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!deviceSearchOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault()
+      setDeviceSearchOpen(true)
+      setHighlightedIndex(0)
+      return
+    }
+
+    if (!deviceSearchOpen) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setHighlightedIndex((prev) =>
+          prev < filteredDevices.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : -1))
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (highlightedIndex === -1) {
+          // Clear selection
+          setLocalSelectedDevice('')
+          onDeviceChange('')
+          onSensorChange('')
+        } else if (highlightedIndex < filteredDevices.length) {
+          const selectedDevice = filteredDevices[highlightedIndex]
+          setLocalSelectedDevice(selectedDevice.id)
+          onDeviceChange(selectedDevice.id)
+          onSensorChange('')
+        }
+        setDeviceSearchOpen(false)
+        setDeviceSearchTerm('')
+        setHighlightedIndex(-1)
+        break
+      case 'Escape':
+        e.preventDefault()
+        setDeviceSearchOpen(false)
+        setHighlightedIndex(-1)
+        break
+      default:
+        break
+    }
+  }
+
+  // Reset highlighted index when search term changes
+  useEffect(() => {
+    setHighlightedIndex(-1)
+  }, [deviceSearchTerm])
 
   // Fetch data when parameters change
   const handleFetchData = async () => {
@@ -114,28 +187,88 @@ export function ConfigurationSidebar({
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Configuration</h2>
 
       {/* Device Selection */}
-      <div className="mb-6">
+      <div className="mb-6 relative">
         <label className="block text-sm font-semibold text-gray-700 mb-2">
           Device
         </label>
         {devicesLoading ? (
           <p className="text-gray-500 text-sm">Loading devices...</p>
         ) : (
-          <select
-            value={selectedDevice || ''}
-            onChange={(e) => {
-              onDeviceChange(e.target.value)
-              onSensorChange('')
-            }}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Select a device</option>
-            {devices.map((device: any) => (
-              <option key={device.id} value={device.id}>
-                {device.name}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            {/* Search Input */}
+            <div
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center bg-white hover:bg-gray-50 focus-within:ring-2 focus-within:ring-blue-500"
+              onClick={() => setDeviceSearchOpen(!deviceSearchOpen)}
+            >
+              <input
+                type="text"
+                placeholder={selectedDevice ? selectedDeviceName : 'Search devices... (Arrow keys to navigate, Enter to select)'}
+                value={deviceSearchOpen ? deviceSearchTerm : ''}
+                onChange={(e) => setDeviceSearchTerm(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full outline-none bg-transparent text-sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDeviceSearchOpen(true)
+                }}
+              />
+              <span className="text-gray-400">▼</span>
+            </div>
+
+            {/* Dropdown Options */}
+            {deviceSearchOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                {/* Clear selection option */}
+                <div
+                  className={`px-4 py-2 cursor-pointer text-sm transition ${
+                    highlightedIndex === -1
+                      ? 'bg-blue-100 text-blue-900'
+                      : 'hover:bg-gray-100 text-gray-600'
+                  }`}
+                  onClick={() => {
+                    setLocalSelectedDevice('')
+                    onDeviceChange('')
+                    onSensorChange('')
+                    setDeviceSearchOpen(false)
+                    setDeviceSearchTerm('')
+                    setHighlightedIndex(-1)
+                  }}
+                  onMouseEnter={() => setHighlightedIndex(-1)}
+                >
+                  Clear selection
+                </div>
+
+                {/* Device options */}
+                {filteredDevices.length > 0 ? (
+                  filteredDevices.map((device: any, index: number) => (
+                    <div
+                      key={device.id}
+                      className={`px-4 py-2 cursor-pointer text-sm transition ${
+                        highlightedIndex === index
+                          ? 'bg-blue-500 text-white'
+                          : localSelectedDevice === device.id
+                          ? 'bg-blue-100 text-blue-900'
+                          : 'hover:bg-gray-100'
+                      }`}
+                      onClick={() => {
+                        setLocalSelectedDevice(device.id)
+                        onDeviceChange(device.id)
+                        onSensorChange('')
+                        setDeviceSearchOpen(false)
+                        setDeviceSearchTerm('')
+                        setHighlightedIndex(-1)
+                      }}
+                      onMouseEnter={() => setHighlightedIndex(index)}
+                    >
+                      {device.name}
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-4 py-2 text-gray-500 text-sm">No devices found</div>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

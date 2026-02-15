@@ -333,7 +333,7 @@ async function runTests() {
     //   return
     // }
 
-    // const deviceId = "GCS_AHU5"
+    const deviceId = "GCS_AHU5"
 
     // // Test 2: Get sensors for first device
     // const sensor = await testGetLatestSensorData(deviceId)
