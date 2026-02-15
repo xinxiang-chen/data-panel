@@ -1,4 +1,4 @@
-import type { IoTDevice, IoTSensor, SensorDataResponse } from "@/types/iot";
+import type { IoTDevice, IoTSensor, SensorDataResponse, LatestDataResponse } from "@/types/iot";
 import { fetchJson } from "@/lib/client/api-client";
 
 export type DevicesResponse = { source: "api" | "mock"; devices: IoTDevice[] };
@@ -28,5 +28,9 @@ export async function apiGetSensorData(params: {
   url.searchParams.set("rollup", params.rollup ? "1" : "0");
   url.searchParams.set("interval", params.interval);
   return await fetchJson<SensorDataResponse>(url.toString());
+}
+
+export async function apiGetLatestData() {
+  return await fetchJson<LatestDataResponse>("/api/latest-data");
 }
 

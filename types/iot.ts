@@ -4,6 +4,7 @@ export type IoTDevice = {
     displayName?: { text?: string };
     description?: { text?: string };
   };
+  sensors?: IoTSensor[];
 };
 
 export type IoTSensor = {
@@ -59,4 +60,18 @@ export type SensorDataResponse =
       suggestedInterval?: string;
       source: "api" | "mock";
     };
+
+export type LatestDataRow = {
+  device: string;
+  sensor: string;
+  description: string | null;
+  latestValue: string | number | null;
+  timestamp: string | null;
+  queriedAt: string | null;
+};
+
+export type LatestDataResponse = {
+  source: "api" | "mock";
+  rows: LatestDataRow[];
+};
 

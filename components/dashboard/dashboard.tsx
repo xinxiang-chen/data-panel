@@ -13,6 +13,7 @@ import { SensorPicker } from "@/components/filters/sensor-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SensorDataResponse } from "@/types/iot";
+import Link from "next/link";
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -91,10 +92,17 @@ export function DashboardPage() {
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50">
       <header className="shrink-0 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between px-2 py-2 sm:px-3 lg:px-4">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-md bg-zinc-900" />
             <div className="text-sm font-semibold">{appName}</div>
+            <nav className="ml-3 flex items-center gap-3 text-xs text-zinc-600">
+              <span className="font-medium text-zinc-900">Dashboard</span>
+              <span className="text-zinc-300">/</span>
+              <Link className="hover:text-zinc-900" href="/latest-data">
+                Latest
+              </Link>
+            </nav>
           </div>
           <div className="text-xs text-zinc-600">
             Source:{" "}
@@ -105,7 +113,7 @@ export function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 items-start gap-4 px-4 py-4 sm:px-6 lg:px-8 md:grid-cols-[320px_1fr]">
+      <main className="mx-auto grid w-full max-w-screen-2xl flex-1 grid-cols-1 items-start gap-3 px-2 py-2 sm:px-3 lg:px-4 md:grid-cols-[320px_1fr]">
         <Card>
           <CardHeader>
             <CardTitle>Filters</CardTitle>
