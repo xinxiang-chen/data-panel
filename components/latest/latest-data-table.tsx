@@ -2,6 +2,8 @@
 
 import type { LatestDataRow } from "@/types/iot";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   ColumnDef,
   flexRender,
@@ -9,7 +11,7 @@ import {
   getPaginationRowModel,
   useReactTable
 } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 function display(v: unknown) {
   if (v === null || v === undefined || v === "") return "N/A";
@@ -67,7 +69,9 @@ function displayLatestValue(row: LatestDataRow) {
   return unit ? `${v} ${unit}` : v;
 }
 
-export function LatestDataTable({ rows }: { rows: LatestDataRow[] }) {
+export function LatestDataTable({ rows, totalRows }: { rows: LatestDataRow[]; totalRows?: number }) {
+  const [pageSize, setPageSize] = useState(100);
+
   const columns = useMemo<ColumnDef<LatestDataRow>[]>(
     () => [
       { accessorKey: "device", header: "Device", cell: (info) => display(info.getValue()) },
@@ -90,14 +94,35 @@ export function LatestDataTable({ rows }: { rows: LatestDataRow[] }) {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 50 } }
+    initialState: { pagination: { pageSize: 100 } }
   });
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-zinc-600">{rows.length} rows</div>
-        <div className="flex gap-2">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="text-xs text-zinc-600">
+          {rows.length} rows{typeof totalRows === "number" ? ` (filtered from ${totalRows})` : ""}
+        </div>
+        <div className="flex items-end gap-3">
+          <div className="flex items-center gap-2">
+            <Label className="whitespace-nowrap">Max records</Label>
+            <Select
+              value={String(pageSize)}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setPageSize(n);
+                table.setPageSize(n);
+                table.setPageIndex(0);
+              }}
+              className="h-8 w-[120px] px-2 text-xs"
+            >
+              {[50, 100, 200, 500, 1000].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </Select>
+          </div>
           <Button variant="ghost" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
             Prev
           </Button>
