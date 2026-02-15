@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Data Panel",
-  description: "IoT sensor dashboard demo"
+  title: "Dashboard - GCS Living Lab",
+  description: "Dashboard for GCS Living Lab"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

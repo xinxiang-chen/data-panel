@@ -11,7 +11,7 @@ import {
   getPaginationRowModel,
   useReactTable
 } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 function display(v: unknown) {
   if (v === null || v === undefined || v === "") return "N/A";
@@ -31,9 +31,11 @@ const TIME_FMT = new Intl.DateTimeFormat("en-US", {
   timeZoneName: "short"
 });
 
-function displayTime(iso: unknown) {
+function displayTime(iso: unknown, mounted: boolean) {
   if (iso === null || iso === undefined || iso === "") return "N/A";
-  const ms = Date.parse(String(iso));
+  const raw = String(iso);
+  if (!mounted) return raw; // avoid SSR/client timezone hydration mismatch
+  const ms = Date.parse(raw);
   if (!Number.isFinite(ms)) return "N/A";
   const d = new Date(ms);
   return `${DATE_FMT.format(d)} at ${TIME_FMT.format(d)}`;
@@ -71,6 +73,11 @@ function displayLatestValue(row: LatestDataRow) {
 
 export function LatestDataTable({ rows, totalRows }: { rows: LatestDataRow[]; totalRows?: number }) {
   const [pageSize, setPageSize] = useState(100);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const columns = useMemo<ColumnDef<LatestDataRow>[]>(
     () => [
@@ -82,10 +89,10 @@ export function LatestDataTable({ rows, totalRows }: { rows: LatestDataRow[]; to
         header: "Latest Value",
         cell: (info) => displayLatestValue(info.row.original)
       },
-      { accessorKey: "timestamp", header: "Timestamp", cell: (info) => displayTime(info.getValue()) },
-      { accessorKey: "queriedAt", header: "Queried At", cell: (info) => displayTime(info.getValue()) }
+      { accessorKey: "timestamp", header: "Timestamp", cell: (info) => displayTime(info.getValue(), mounted) },
+      { accessorKey: "queriedAt", header: "Queried At", cell: (info) => displayTime(info.getValue(), mounted) }
     ],
-    []
+    [mounted]
   );
 
   // eslint-disable-next-line react-hooks/incompatible-library

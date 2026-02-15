@@ -100,7 +100,7 @@ export function DashboardPage() {
               <span className="font-medium text-zinc-900">Dashboard</span>
               <span className="text-zinc-300">/</span>
               <Link className="hover:text-zinc-900" href="/latest-data">
-                Latest
+                Latest Data
               </Link>
             </nav>
           </div>

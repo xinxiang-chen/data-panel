@@ -9,6 +9,17 @@ body {
   height: 100%;
 }
 
+/* Scale all Tailwind rem-based font sizes up globally. */
+html {
+  font-size: 18px;
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 19px;
+  }
+}
+
 body {
   @apply bg-white text-zinc-900 antialiased;
 }

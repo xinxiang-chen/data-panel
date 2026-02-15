@@ -2,7 +2,6 @@
 
 import { toNumberish } from "@/lib/sensor-logic";
 import type { IoTRawPoint, IoTRollupPoint } from "@/types/iot";
-import { format } from "date-fns";
 import {
   CartesianGrid,
   Legend,
@@ -17,9 +16,52 @@ import {
 type RawDatum = { ts: number; value: number | null; iso: string };
 type RollupDatum = { ts: number; avg: number | null; min?: number | null; max?: number | null; iso: string };
 
-function fmtLocalTime(ms: number) {
-  // Local time in the browser.
-  return format(new Date(ms), "MMM dd, HH:mm");
+const PT_FMT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Los_Angeles",
+  month: "short",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false
+});
+
+function fmtPacificTime(ms: number) {
+  const parts = PT_FMT.formatToParts(new Date(ms));
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  const hour = parts.find((p) => p.type === "hour")?.value ?? "";
+  const minute = parts.find((p) => p.type === "minute")?.value ?? "";
+  return `${month} ${day}, ${hour}:${minute}`;
+}
+
+function computeYDomain(mode: "raw" | "rollup", data: Array<RawDatum | RollupDatum>): [number, number] | undefined {
+  const values: number[] = [];
+  if (mode === "raw") {
+    for (const d of data as RawDatum[]) {
+      if (typeof d.value === "number" && Number.isFinite(d.value)) values.push(d.value);
+    }
+  } else {
+    for (const d of data as RollupDatum[]) {
+      for (const v of [d.avg, d.min, d.max]) {
+        if (typeof v === "number" && Number.isFinite(v)) values.push(v);
+      }
+    }
+  }
+
+  if (values.length === 0) return undefined;
+
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+
+  if (min === max) {
+    const delta = min === 0 ? 1 : Math.abs(min) * 0.1;
+    return [min - delta, max + delta];
+  }
+
+  const pad = (max - min) * 0.05;
+  min -= pad;
+  max += pad;
+  return [min, max];
 }
 
 export function SensorLineChart({
@@ -54,6 +96,8 @@ export function SensorLineChart({
           })
           .filter((d) => Number.isFinite(d.ts));
 
+  const yDomain = computeYDomain(mode, data as any);
+
   return (
     <div className="h-[360px] w-full">
       <ResponsiveContainer>
@@ -67,11 +111,12 @@ export function SensorLineChart({
             tickCount={6}
             interval="preserveStartEnd"
             minTickGap={24}
-            tickFormatter={(v) => fmtLocalTime(Number(v))}
+            tickFormatter={(v) => fmtPacificTime(Number(v))}
           />
           <YAxis
             tickFormatter={(v) => String(v)}
             width={50}
+            domain={yDomain ?? ["auto", "auto"]}
             label={
               unit
                 ? {
@@ -85,7 +130,7 @@ export function SensorLineChart({
           />
           <Tooltip
             formatter={(value: any, name: any) => [value, String(name)]}
-            labelFormatter={(label) => fmtLocalTime(Number(label))}
+            labelFormatter={(label) => fmtPacificTime(Number(label))}
           />
           <Legend />
           {mode === "raw" ? (
