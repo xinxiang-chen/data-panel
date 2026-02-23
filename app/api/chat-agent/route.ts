@@ -62,6 +62,10 @@ export async function POST(req: Request) {
   };
 
   try {
+    const controller = new AbortController();
+    const timeoutMs = 30_000;
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
     const upstream = await fetch(webhookUrl, {
       method: "POST",
       headers: {
@@ -69,8 +73,10 @@ export async function POST(req: Request) {
         Accept: "application/json"
       },
       body: JSON.stringify(payload),
-      cache: "no-store"
+      cache: "no-store",
+      signal: controller.signal
     });
+    clearTimeout(timeout);
 
     const rawText = await upstream.text();
     let parsed: unknown = rawText;
@@ -96,6 +102,12 @@ export async function POST(req: Request) {
       raw: parsed
     });
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return NextResponse.json(
+        { error: "n8n request timed out (30s)" },
+        { status: 504 }
+      );
+    }
     const messageText = error instanceof Error ? error.message : "Failed to connect to n8n webhook";
     return NextResponse.json({ error: messageText }, { status: 502 });
   }

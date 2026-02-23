@@ -9,11 +9,105 @@ import { apiSendChatMessage } from "@/lib/client/chat-agent";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 
 type Message = {
   role: "user" | "assistant";
   text: string;
 };
+
+type HistoryPoint = {
+  value: number | null;
+  timestamp: string;
+};
+
+function tryParseJson(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const s = value.trim();
+  if (!s) return value;
+  try {
+    return JSON.parse(s);
+  } catch {
+    return value;
+  }
+}
+
+function parsePossiblyStringifiedJson(value: unknown): unknown {
+  let cur: unknown = value;
+  for (let i = 0; i < 3; i++) {
+    const next = tryParseJson(cur);
+    if (next === cur) break;
+    cur = next;
+  }
+  return cur;
+}
+
+function pickValueAndTimestamp(value: unknown): HistoryPoint[] | null {
+  const parsed = parsePossiblyStringifiedJson(value);
+  const arr = Array.isArray(parsed) ? parsed : null;
+  if (!arr) return null;
+
+  return arr
+    .map((p: any) => ({
+      value: (() => {
+        const v = p?.value;
+        if (v == null) return null;
+        const n = typeof v === "number" ? v : Number(v);
+        return Number.isFinite(n) ? n : null;
+      })(),
+      timestamp: String(p?.timestamp ?? "")
+    }))
+    .filter((p) => p.timestamp.trim().length > 0);
+}
+
+function getFirstHistoryObservation(raw: unknown): HistoryPoint[] | null {
+  const parsed = tryParseJson(raw) as any;
+
+  const steps =
+    parsed?.intermediateSteps ??
+    parsed?.output?.intermediateSteps ??
+    parsed?.data?.intermediateSteps ??
+    (Array.isArray(parsed) ? parsed : null);
+
+  if (!Array.isArray(steps)) return null;
+
+  const historySteps = steps.filter((s: any) => s?.action?.tool === "getHistoryData");
+  if (historySteps.length === 0) return null;
+
+  const first = historySteps[0];
+  const obs = first?.observation;
+  const firstObs = Array.isArray(obs) ? obs[0] : obs;
+
+  const cleaned = pickValueAndTimestamp(firstObs);
+  return cleaned;
+}
+
+const PT_FMT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Los_Angeles",
+  month: "short",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false
+});
+
+function fmtPacificTime(ms: number) {
+  const parts = PT_FMT.formatToParts(new Date(ms));
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  const hour = parts.find((p) => p.type === "hour")?.value ?? "";
+  const minute = parts.find((p) => p.type === "minute")?.value ?? "";
+  return `${month} ${day}, ${hour}:${minute}`;
+}
 
 function createSessionId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -26,6 +120,8 @@ export function ChatAgentPage() {
   const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Data Panel";
   const [sessionId] = useState(() => createSessionId());
   const [draft, setDraft] = useState("");
+  const [history, setHistory] = useState<HistoryPoint[] | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -38,6 +134,13 @@ export function ChatAgentPage() {
       return await apiSendChatMessage({ message, sessionId });
     },
     onSuccess: (data) => {
+      const cleaned = getFirstHistoryObservation(data.raw);
+      if (cleaned && cleaned.length > 0) {
+        setHistory(cleaned);
+        setHistoryOpen(true);
+        // Debug helper: surface tool output in browser console.
+        console.log("getHistoryData observation[0] cleaned:", cleaned);
+      }
       setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
     },
     onError: (error) => {
@@ -64,7 +167,7 @@ export function ChatAgentPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50">
+    <div className="flex h-dvh min-h-0 flex-col bg-zinc-50">
       <header className="shrink-0 border-b border-zinc-200 bg-white">
         <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between px-2 py-2 sm:px-3 lg:px-4">
           <div className="flex items-center gap-3">
@@ -88,74 +191,150 @@ export function ChatAgentPage() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-screen-2xl flex-1 flex-col px-2 py-2 sm:px-3 lg:px-4">
-        <Card className="flex min-h-[70vh] flex-1 flex-col">
+      <main className="mx-auto flex w-full max-w-screen-2xl flex-1 min-h-0 flex-col px-2 py-2 sm:px-3 lg:px-4">
+        <Card className="flex flex-1 min-h-0 flex-col">
           <CardHeader>
             <CardTitle>Agent</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col gap-3">
-            <div className="flex-1 space-y-3 overflow-y-auto rounded-md border border-zinc-200 bg-white p-3">
-              {messages.map((message, idx) => (
-                <div
-                  key={`${message.role}-${idx}`}
-                  className={
-                    message.role === "user"
-                      ? "ml-auto w-fit max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-md bg-zinc-900 px-3 py-2 text-sm text-white"
-                      : "mr-auto w-fit max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-md bg-zinc-100 px-3 py-2 text-sm text-zinc-900"
-                  }
-                >
-                  {message.role === "assistant" ? (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                        ul: ({ children }) => <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>,
-                        ol: ({ children }) => <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>,
-                        li: ({ children }) => <li className="mb-1">{children}</li>,
-                        code: ({ children }) => (
-                          <code className="rounded bg-zinc-200 px-1 py-0.5 text-[0.9em]">{children}</code>
-                        ),
-                        pre: ({ children }) => (
-                          <pre className="mb-2 overflow-x-auto rounded bg-zinc-200 p-2 text-[0.9em]">
-                            {children}
-                          </pre>
-                        ),
-                        a: ({ href, children }) => (
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline decoration-zinc-400 underline-offset-2 hover:decoration-zinc-700"
-                          >
-                            {children}
-                          </a>
-                        )
-                      }}
-                    >
-                      {message.text}
-                    </ReactMarkdown>
-                  ) : (
-                    message.text
-                  )}
-                </div>
-              ))}
+          <CardContent className="relative flex flex-1 min-h-0 gap-3 overflow-hidden">
+            {/* Collapsible history chart panel */}
+            {history ? (
+              <button
+                type="button"
+                className="absolute left-2 top-2 z-20 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-700 shadow-sm hover:bg-zinc-50"
+                onClick={() => setHistoryOpen((v) => !v)}
+                title={historyOpen ? "Hide graph" : "Show graph"}
+              >
+                {historyOpen ? "<" : ">"}
+              </button>
+            ) : null}
+            <div
+              className={cn(
+                "relative min-h-0 min-w-0 transition-all",
+                history && historyOpen ? "flex-7 opacity-100" : "flex-0 w-0 opacity-0 pointer-events-none"
+              )}
+            >
+              <div
+                className={cn(
+                  "h-full min-h-0 overflow-hidden rounded-md border border-zinc-200 bg-white"
+                )}
+              >
+                {history ? (
+                  <div className="flex h-full flex-col">
+                    <div className="border-b border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-900">
+                      History Graph
+                    </div>
+                    <div className="flex-1 min-h-0 p-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={history
+                            .map((p) => {
+                              const ts = Date.parse(p.timestamp);
+                              return Number.isFinite(ts) ? { ts, value: p.value } : null;
+                            })
+                            .filter(Boolean) as any}
+                          margin={{ top: 10, right: 12, left: 0, bottom: 10 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                          <XAxis
+                            dataKey="ts"
+                            type="number"
+                            domain={["dataMin", "dataMax"]}
+                            scale="time"
+                            tickCount={5}
+                            interval="preserveStartEnd"
+                            minTickGap={20}
+                            tickFormatter={(v) => fmtPacificTime(Number(v))}
+                          />
+                          <YAxis width={44} />
+                          <Tooltip labelFormatter={(label) => fmtPacificTime(Number(label))} />
+                          <Line
+                            type="monotone"
+                            dataKey="value"
+                            stroke="#18181b"
+                            strokeWidth={2}
+                            dot={false}
+                            isAnimationActive={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
-            <div className="flex gap-2">
-              <Input
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder="Send a prompt to your local agent…"
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void handleSend();
-                  }
-                }}
-              />
-              <Button onClick={() => void handleSend()} disabled={!canSend}>
-                Send
-              </Button>
+            {/* Chat panel */}
+            <div className="flex min-w-0 flex-3 min-h-0 flex-col gap-3">
+              <div className="flex-1 min-h-0 space-y-3 overflow-y-auto rounded-md border border-zinc-200 bg-white p-3">
+                {messages.map((message, idx) => (
+                  <div
+                    key={`${message.role}-${idx}`}
+                    className={
+                      message.role === "user"
+                        ? "ml-auto w-fit max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-md bg-zinc-900 px-3 py-2 text-sm text-white"
+                        : "mr-auto w-fit max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-md bg-zinc-100 px-3 py-2 text-sm text-zinc-900"
+                    }
+                  >
+                    {message.role === "assistant" ? (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                          ul: ({ children }) => (
+                            <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>
+                          ),
+                          ol: ({ children }) => (
+                            <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>
+                          ),
+                          li: ({ children }) => <li className="mb-1">{children}</li>,
+                          code: ({ children }) => (
+                            <code className="rounded bg-zinc-200 px-1 py-0.5 text-[0.9em]">
+                              {children}
+                            </code>
+                          ),
+                          pre: ({ children }) => (
+                            <pre className="mb-2 overflow-x-auto rounded bg-zinc-200 p-2 text-[0.9em]">
+                              {children}
+                            </pre>
+                          ),
+                          a: ({ href, children }) => (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline decoration-zinc-400 underline-offset-2 hover:decoration-zinc-700"
+                            >
+                              {children}
+                            </a>
+                          )
+                        }}
+                      >
+                        {message.text}
+                      </ReactMarkdown>
+                    ) : (
+                      message.text
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder="Send a prompt to your local agent…"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleSend();
+                    }
+                  }}
+                />
+                <Button onClick={() => void handleSend()} disabled={!canSend}>
+                  Send
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
