@@ -227,7 +227,7 @@ export function ChatAgentPage() {
               >
                 {history ? (
                   <div className="flex h-full flex-col">
-                    <div className="border-b border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-900">
+                    <div className="border-b border-zinc-200 pl-6 px-3 py-2 text-xs font-semibold text-zinc-900">
                       History Graph
                     </div>
                     <div className="flex-1 min-h-0 p-2">
