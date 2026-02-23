@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { apiSendChatMessage } from "@/lib/client/chat-agent";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,7 +79,7 @@ export function ChatAgentPage() {
                 Latest Data
               </Link>
               <span className="text-zinc-300">/</span>
-              <span className="font-medium text-zinc-900">Chat Agent</span>
+              <span className="font-medium text-zinc-900">🤖 Agent Preview</span>
             </nav>
           </div>
           <div className="text-xs text-zinc-600">
@@ -89,7 +91,7 @@ export function ChatAgentPage() {
       <main className="mx-auto flex w-full max-w-screen-2xl flex-1 flex-col px-2 py-2 sm:px-3 lg:px-4">
         <Card className="flex min-h-[70vh] flex-1 flex-col">
           <CardHeader>
-            <CardTitle>n8n Chat Agent</CardTitle>
+            <CardTitle>Agent</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-3">
             <div className="flex-1 space-y-3 overflow-y-auto rounded-md border border-zinc-200 bg-white p-3">
@@ -98,11 +100,43 @@ export function ChatAgentPage() {
                   key={`${message.role}-${idx}`}
                   className={
                     message.role === "user"
-                      ? "ml-auto max-w-[85%] rounded-md bg-zinc-900 px-3 py-2 text-sm text-white"
-                      : "mr-auto max-w-[85%] rounded-md bg-zinc-100 px-3 py-2 text-sm text-zinc-900"
+                      ? "ml-auto w-fit max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-md bg-zinc-900 px-3 py-2 text-sm text-white"
+                      : "mr-auto w-fit max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-md bg-zinc-100 px-3 py-2 text-sm text-zinc-900"
                   }
                 >
-                  {message.text}
+                  {message.role === "assistant" ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        code: ({ children }) => (
+                          <code className="rounded bg-zinc-200 px-1 py-0.5 text-[0.9em]">{children}</code>
+                        ),
+                        pre: ({ children }) => (
+                          <pre className="mb-2 overflow-x-auto rounded bg-zinc-200 p-2 text-[0.9em]">
+                            {children}
+                          </pre>
+                        ),
+                        a: ({ href, children }) => (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline decoration-zinc-400 underline-offset-2 hover:decoration-zinc-700"
+                          >
+                            {children}
+                          </a>
+                        )
+                      }}
+                    >
+                      {message.text}
+                    </ReactMarkdown>
+                  ) : (
+                    message.text
+                  )}
                 </div>
               ))}
             </div>
@@ -111,7 +145,7 @@ export function ChatAgentPage() {
               <Input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder="Send a prompt to your local n8n chat workflow…"
+                placeholder="Send a prompt to your local agent…"
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
