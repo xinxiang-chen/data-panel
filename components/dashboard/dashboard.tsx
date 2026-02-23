@@ -102,6 +102,10 @@ export function DashboardPage() {
               <Link className="hover:text-zinc-900" href="/latest-data">
                 Latest Data
               </Link>
+              <span className="text-zinc-300">/</span>
+              <Link className="hover:text-zinc-900" href="/chat-agent">
+                Chat Agent
+              </Link>
             </nav>
           </div>
           <div className="text-xs text-zinc-600">

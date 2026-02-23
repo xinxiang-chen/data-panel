@@ -81,6 +81,10 @@ export function LatestDataPage() {
               </Link>
               <span className="text-zinc-300">/</span>
               <span className="font-medium text-zinc-900">Latest Data</span>
+              <span className="text-zinc-300">/</span>
+              <Link className="hover:text-zinc-900" href="/chat-agent">
+                Chat Agent
+              </Link>
             </nav>
           </div>
           <div className="text-xs text-zinc-600">

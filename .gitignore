@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # API example
 scripts/json/*
+
+# Others
+.DS_Store
