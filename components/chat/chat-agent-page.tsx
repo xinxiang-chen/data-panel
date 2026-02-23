@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -122,6 +122,7 @@ export function ChatAgentPage() {
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState<HistoryPoint[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -165,6 +166,11 @@ export function ChatAgentPage() {
     setMessages((prev) => [...prev, { role: "user", text }]);
     await sendMutation.mutateAsync(text);
   };
+
+  useEffect(() => {
+    // Keep the chat pinned to latest messages / typing indicator.
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length, sendMutation.isPending]);
 
   return (
     <div className="flex h-dvh min-h-0 flex-col bg-zinc-50">
@@ -317,6 +323,17 @@ export function ChatAgentPage() {
                     )}
                   </div>
                 ))}
+
+                {sendMutation.isPending ? (
+                  <div className="mr-auto w-fit max-w-[85%] rounded-md bg-zinc-100 px-3 py-2 text-sm text-zinc-900">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-500 [animation-delay:-0.2s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-500 [animation-delay:-0.1s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-500" />
+                    </span>
+                  </div>
+                ) : null}
+                <div ref={chatEndRef} />
               </div>
 
               <div className="flex gap-2">
@@ -324,6 +341,7 @@ export function ChatAgentPage() {
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   placeholder="Send a prompt to your local agent…"
+                  disabled={sendMutation.isPending}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
@@ -332,7 +350,14 @@ export function ChatAgentPage() {
                   }}
                 />
                 <Button onClick={() => void handleSend()} disabled={!canSend}>
-                  Send
+                  {sendMutation.isPending ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
+                      Sending
+                    </span>
+                  ) : (
+                    "Send"
+                  )}
                 </Button>
               </div>
             </div>

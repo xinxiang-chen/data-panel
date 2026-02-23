@@ -1,2 +1,4 @@
 What was the air flow for vav_b2_13 looks like over the past 1 week?
 What was the room temperature for vav_b2_07 looks like over the past 5 days? What can you infer from these data?
+What was the solar panel data for PV looks like over the past 10 days? Can we infer the bad weather from these data?
+What was the air temp in ahu5 over the past week?
