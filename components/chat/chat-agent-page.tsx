@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Dice5 } from "lucide-react";
 import { apiSendChatMessage } from "@/lib/client/chat-agent";
+import { apiGetExampleQueries } from "@/lib/client/example-queries";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -129,6 +131,14 @@ export function ChatAgentPage() {
       text: "Connected to chat agent. Ask about devices, sensors, trends, or latest data."
     }
   ]);
+
+  const exampleQueriesQuery = useQuery({
+    queryKey: ["example-queries"],
+    queryFn: apiGetExampleQueries,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY
+  });
+  const exampleQueries = exampleQueriesQuery.data?.queries ?? [];
 
   const sendMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -349,6 +359,23 @@ export function ChatAgentPage() {
                     }
                   }}
                 />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={sendMutation.isPending || exampleQueries.length === 0}
+                  title={
+                    exampleQueries.length > 0
+                      ? "Fill a random example query"
+                      : "No example queries found (data/mock/example_query/example_queries.txt)"
+                  }
+                  onClick={() => {
+                    if (exampleQueries.length === 0) return;
+                    const idx = Math.floor(Math.random() * exampleQueries.length);
+                    setDraft(exampleQueries[idx] ?? "");
+                  }}
+                >
+                  <Dice5 className="h-4 w-4" />
+                </Button>
                 <Button onClick={() => void handleSend()} disabled={!canSend}>
                   {sendMutation.isPending ? (
                     <span className="inline-flex items-center gap-2">
