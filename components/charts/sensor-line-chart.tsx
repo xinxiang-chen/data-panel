@@ -7,11 +7,13 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
+import { useMemo, useState } from "react";
 
 type RawDatum = { ts: number; value: number | null; iso: string };
 type RollupDatum = { ts: number; avg: number | null; min?: number | null; max?: number | null; iso: string };
@@ -64,6 +66,11 @@ function computeYDomain(mode: "raw" | "rollup", data: Array<RawDatum | RollupDat
   return [min, max];
 }
 
+function fmtNumber(n: number | null, digits = 3) {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return String(Number(n.toFixed(digits)));
+}
+
 export function SensorLineChart({
   mode,
   points,
@@ -75,6 +82,8 @@ export function SensorLineChart({
   sensorName: string;
   unit?: string;
 }) {
+  const [hover, setHover] = useState<{ ts: number; value: number | null } | null>(null);
+
   const data =
     mode === "raw"
       ? (points as IoTRawPoint[])
@@ -96,12 +105,66 @@ export function SensorLineChart({
           })
           .filter((d) => Number.isFinite(d.ts));
 
+  const primarySeries = useMemo(() => {
+    if (mode === "raw") {
+      return (data as RawDatum[]).map((d) => ({ ts: d.ts, value: d.value }));
+    }
+    return (data as RollupDatum[]).map((d) => ({ ts: d.ts, value: d.avg ?? null }));
+  }, [data, mode]);
+
+  const stats = useMemo(() => {
+    let count = 0;
+    let sum = 0;
+    let min: { ts: number; value: number } | null = null;
+    let max: { ts: number; value: number } | null = null;
+
+    for (const p of primarySeries) {
+      const v = p.value;
+      if (typeof v !== "number" || !Number.isFinite(v)) continue;
+      count += 1;
+      sum += v;
+      if (!min || v < min.value) min = { ts: p.ts, value: v };
+      if (!max || v > max.value) max = { ts: p.ts, value: v };
+    }
+
+    return { count, min, max, avg: count > 0 ? sum / count : null };
+  }, [primarySeries]);
+
+  const chartData = useMemo(() => {
+    if (stats.avg == null) return data as any[];
+    return (data as any[]).map((d) => ({ ...d, overallAvg: stats.avg }));
+  }, [data, stats.avg]);
+
   const yDomain = computeYDomain(mode, data as any);
 
   return (
     <div className="h-[360px] w-full">
+      <div className="mb-2 text-xs text-zinc-600">
+        {hover ? (
+          <span className="mr-2">
+            {fmtPacificTime(hover.ts)}: <span className="font-medium text-zinc-900">{hover.value ?? "—"}</span>
+          </span>
+        ) : null}
+        {stats.count > 0 ? (
+          <span>
+            min {fmtNumber(stats.min?.value ?? null)} · avg {fmtNumber(stats.avg)} · max {fmtNumber(stats.max?.value ?? null)}
+          </span>
+        ) : null}
+      </div>
+
       <ResponsiveContainer>
-        <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+        <LineChart
+          data={chartData}
+          margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
+          onMouseMove={(e: any) => {
+            const payload = e?.activePayload?.[0]?.payload;
+            if (payload && typeof payload.ts === "number") {
+              const value = mode === "raw" ? payload.value ?? null : payload.avg ?? null;
+              setHover({ ts: payload.ts, value });
+            }
+          }}
+          onMouseLeave={() => setHover(null)}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
           <XAxis
             dataKey="ts"
@@ -133,6 +196,18 @@ export function SensorLineChart({
             labelFormatter={(label) => fmtPacificTime(Number(label))}
           />
           <Legend />
+          {stats.avg != null ? (
+            <Line
+              type="monotone"
+              dataKey="overallAvg"
+              name="Average"
+              stroke="#2563eb"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+              dot={false}
+              isAnimationActive={false}
+            />
+          ) : null}
           {mode === "raw" ? (
             <Line
               type="monotone"
@@ -141,6 +216,7 @@ export function SensorLineChart({
               stroke="#18181b"
               strokeWidth={2}
               dot={false}
+              activeDot={{ r: 4 }}
               isAnimationActive={false}
             />
           ) : (
@@ -152,6 +228,7 @@ export function SensorLineChart({
                 stroke="#18181b"
                 strokeWidth={2}
                 dot={false}
+                activeDot={{ r: 4 }}
                 isAnimationActive={false}
               />
               <Line
@@ -174,6 +251,12 @@ export function SensorLineChart({
               />
             </>
           )}
+          {stats.max ? (
+            <ReferenceDot x={stats.max.ts} y={stats.max.value} r={5} fill="#ef4444" stroke="#ef4444" />
+          ) : null}
+          {stats.min ? (
+            <ReferenceDot x={stats.min.ts} y={stats.min.value} r={5} fill="#22c55e" stroke="#22c55e" />
+          ) : null}
         </LineChart>
       </ResponsiveContainer>
     </div>

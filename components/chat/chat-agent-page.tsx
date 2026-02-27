@@ -17,6 +17,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -31,6 +32,13 @@ type Message = {
 type HistoryPoint = {
   value: number | null;
   timestamp: string;
+};
+
+type HistoryStats = {
+  count: number;
+  min: { ts: number; value: number } | null;
+  max: { ts: number; value: number } | null;
+  avg: number | null;
 };
 
 type SensorMeta = {
@@ -160,6 +168,11 @@ function fmtPacificTime(ms: number) {
   return `${month} ${day}, ${hour}:${minute}`;
 }
 
+function fmtNumber(n: number | null, digits = 3) {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return String(Number(n.toFixed(digits)));
+}
+
 function createSessionId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -191,7 +204,7 @@ export function ChatAgentPage() {
   });
   const exampleQueries = exampleQueriesQuery.data?.queries ?? [];
 
-  const historyChartData = useMemo(() => {
+  const historySeries = useMemo(() => {
     if (!history) return [];
     return history
       .map((p) => {
@@ -200,6 +213,36 @@ export function ChatAgentPage() {
       })
       .filter(Boolean) as Array<{ ts: number; value: number | null }>;
   }, [history]);
+
+  const historyStats = useMemo<HistoryStats>(() => {
+    let count = 0;
+    let sum = 0;
+    let min: { ts: number; value: number } | null = null;
+    let max: { ts: number; value: number } | null = null;
+
+    for (const p of historySeries) {
+      const v = p.value;
+      if (typeof v !== "number" || !Number.isFinite(v)) continue;
+      count += 1;
+      sum += v;
+      if (!min || v < min.value) min = { ts: p.ts, value: v };
+      if (!max || v > max.value) max = { ts: p.ts, value: v };
+    }
+
+    return {
+      count,
+      min,
+      max,
+      avg: count > 0 ? sum / count : null
+    };
+  }, [historySeries]);
+
+  const historyChartData = useMemo(() => {
+    return historySeries.map((p) => ({
+      ...p,
+      avg: historyStats.avg
+    }));
+  }, [historySeries, historyStats.avg]);
 
   const sendMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -317,6 +360,13 @@ export function ChatAgentPage() {
                           </span>
                         </span>
                       ) : null}
+                      {historyStats.count > 0 ? (
+                        <span className="ml-2 font-normal text-zinc-600">
+                          · min {fmtNumber(historyStats.min?.value ?? null)} · avg{" "}
+                          {fmtNumber(historyStats.avg)} · max{" "}
+                          {fmtNumber(historyStats.max?.value ?? null)}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="flex-1 min-h-0 p-2">
                       <ResponsiveContainer width="100%" height="100%">
@@ -362,6 +412,18 @@ export function ChatAgentPage() {
                             formatter={(value: any) => [value, historyMeta?.unit ? `Value (${historyMeta.unit})` : "Value"]}
                           />
                           <Legend />
+                          {historyStats.avg != null ? (
+                            <Line
+                              type="monotone"
+                              dataKey="avg"
+                              name="Average"
+                              stroke="#2563eb"
+                              strokeWidth={1.5}
+                              strokeDasharray="4 4"
+                              dot={false}
+                              isAnimationActive={false}
+                            />
+                          ) : null}
                           <Line
                             type="monotone"
                             dataKey="value"
@@ -372,6 +434,24 @@ export function ChatAgentPage() {
                             activeDot={{ r: 4 }}
                             isAnimationActive={false}
                           />
+                          {historyStats.max ? (
+                            <ReferenceDot
+                              x={historyStats.max.ts}
+                              y={historyStats.max.value}
+                              r={5}
+                              fill="#ef4444"
+                              stroke="#ef4444"
+                            />
+                          ) : null}
+                          {historyStats.min ? (
+                            <ReferenceDot
+                              x={historyStats.min.ts}
+                              y={historyStats.min.value}
+                              r={5}
+                              fill="#22c55e"
+                              stroke="#22c55e"
+                            />
+                          ) : null}
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
