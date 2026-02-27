@@ -90,7 +90,7 @@ export function DashboardPage() {
     Number.isNaN(Date.parse(toUtcIsoFromDatetimeLocal(endLocal)));
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50">
+    <div className="flex h-dvh min-h-0 flex-col bg-zinc-50">
       <header className="shrink-0 border-b border-zinc-200 bg-white">
         <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between px-2 py-2 sm:px-3 lg:px-4">
           <div className="flex items-center gap-3">
@@ -117,51 +117,53 @@ export function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-screen-2xl flex-1 grid-cols-1 items-start gap-3 px-2 py-2 sm:px-3 lg:px-4 md:grid-cols-[320px_1fr]">
-        <Card>
+      <main className="mx-auto grid w-full max-w-screen-2xl flex-1 min-h-0 grid-cols-1 items-stretch gap-3 px-2 py-2 sm:px-3 lg:px-4 md:grid-cols-[320px_1fr]">
+        <Card className="flex min-h-0 flex-col">
           <CardHeader>
             <CardTitle>Filters</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <DevicePicker
-              devices={devices}
-              value={selectedDeviceId}
-              onChange={(v) => {
-                setDeviceId(v);
-                setSensorId(null);
-              }}
-              disabled={devicesQuery.isLoading}
-            />
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+              <DevicePicker
+                devices={devices}
+                value={selectedDeviceId}
+                onChange={(v) => {
+                  setDeviceId(v);
+                  setSensorId(null);
+                }}
+                disabled={devicesQuery.isLoading}
+              />
 
-            <SensorPicker
-              sensors={sensors}
-              value={selectedSensorId}
-              onChange={(v) => setSensorId(v)}
-              disabled={!selectedDeviceId || sensorsQuery.isLoading}
-            />
+              <SensorPicker
+                sensors={sensors}
+                value={selectedSensorId}
+                onChange={(v) => setSensorId(v)}
+                disabled={!selectedDeviceId || sensorsQuery.isLoading}
+              />
 
-            <DateRangePicker
-              start={startLocal}
-              end={endLocal}
-              onChangeStart={setStartLocal}
-              onChangeEnd={setEndLocal}
-              onQuickRangeDays={(days) => {
-                const d = new Date();
-                setEndLocal(toDatetimeLocalValue(d));
-                setStartLocal(toDatetimeLocalValue(new Date(d.getTime() - days * 24 * 60 * 60 * 1000)));
-              }}
-            />
+              <DateRangePicker
+                start={startLocal}
+                end={endLocal}
+                onChangeStart={setStartLocal}
+                onChangeEnd={setEndLocal}
+                onQuickRangeDays={(days) => {
+                  const d = new Date();
+                  setEndLocal(toDatetimeLocalValue(d));
+                  setStartLocal(toDatetimeLocalValue(new Date(d.getTime() - days * 24 * 60 * 60 * 1000)));
+                }}
+              />
 
-            <RollupControls
-              enabled={rollupEnabled}
-              interval={rollupInterval}
-              onChangeEnabled={setRollupEnabled}
-              onChangeInterval={setRollupInterval}
-              suggestedInterval={data?.suggestedInterval}
-            />
+              <RollupControls
+                enabled={rollupEnabled}
+                interval={rollupInterval}
+                onChangeEnabled={setRollupEnabled}
+                onChangeInterval={setRollupInterval}
+                suggestedInterval={data?.suggestedInterval}
+              />
+            </div>
 
             <Button
-              className="w-full"
+              className="w-full shrink-0"
               onClick={() => {
                 const startDate = toUtcIsoFromDatetimeLocal(startLocal);
                 const endDate = toUtcIsoFromDatetimeLocal(endLocal);
@@ -185,8 +187,8 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <div>
-          <Card>
+        <div className="min-h-0">
+          <Card className="flex min-h-0 h-full flex-col">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Results</CardTitle>
               <div className="flex gap-2">
@@ -198,38 +200,44 @@ export function DashboardPage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {!committed ? (
-                <div className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-600">
-                  Pick a device/sensor + date range, then click <span className="font-medium">Run query</span>.
-                </div>
-              ) : dataQuery.isLoading ? (
-                <div className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-600">Loading…</div>
-              ) : dataQuery.isError ? (
-                <div className="rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-                  Failed to load sensor data.
-                </div>
-              ) : data ? (
-                <>
-                  {data.suggestedInterval ? (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                      Suggestion: enable roll-up and try interval <span className="font-medium">{data.suggestedInterval}</span> for
-                      large ranges.
-                    </div>
-                  ) : null}
+            <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+              <div className="min-h-0 flex-1 overflow-hidden">
+                {!committed ? (
+                  <div className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-600">
+                    Pick a device/sensor + date range, then click <span className="font-medium">Run query</span>.
+                  </div>
+                ) : dataQuery.isLoading ? (
+                  <div className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-600">Loading…</div>
+                ) : dataQuery.isError ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+                    Failed to load sensor data.
+                  </div>
+                ) : data ? (
+                  <>
+                    {data.suggestedInterval ? (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                        Suggestion: enable roll-up and try interval <span className="font-medium">{data.suggestedInterval}</span> for
+                        large ranges.
+                      </div>
+                    ) : null}
 
-                  {activeView === "chart" ? (
-                    <SensorLineChart
-                      mode={data.mode}
-                      points={data.points as any}
-                      sensorName={committed.sensorName}
-                      unit={committed.sensorUnit}
-                    />
-                  ) : (
-                    <DataTable mode={data.mode} points={data.points as any} />
-                  )}
-                </>
-              ) : null}
+                    {activeView === "chart" ? (
+                      <div className="min-h-0 h-full">
+                        <SensorLineChart
+                          mode={data.mode}
+                          points={data.points as any}
+                          sensorName={committed.sensorName}
+                          unit={committed.sensorUnit}
+                        />
+                      </div>
+                    ) : (
+                      <div className="min-h-0 h-full">
+                        <DataTable mode={data.mode} points={data.points as any} />
+                      </div>
+                    )}
+                  </>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         </div>

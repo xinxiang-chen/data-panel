@@ -148,7 +148,7 @@ export function SensorLineChart({
   const yDomain = computeYDomain(mode, data as any);
 
   return (
-    <div className="h-[360px] w-full">
+    <div className="flex h-full min-h-0 w-full flex-col">
       <div className="mb-2 text-xs text-zinc-600">
         {hover ? (
           <span className="mr-2">
@@ -162,7 +162,8 @@ export function SensorLineChart({
         ) : null}
       </div>
 
-      <ResponsiveContainer>
+      <div className="min-h-0 flex-1">
+        <ResponsiveContainer>
         <LineChart
           data={chartData}
           margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
@@ -272,7 +273,8 @@ export function SensorLineChart({
             <ReferenceDot x={stats.min.ts} y={stats.min.value} r={5} fill="#22c55e" stroke="#22c55e" />
           ) : null}
         </LineChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

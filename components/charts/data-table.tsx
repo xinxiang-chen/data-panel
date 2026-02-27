@@ -79,8 +79,8 @@ export function DataTable({ mode, points }: { mode: Mode; points: IoTRawPoint[] 
   });
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex shrink-0 items-center justify-between gap-3">
         <div className="text-xs text-zinc-600">{rows.length} rows</div>
         <Button
           variant="secondary"
@@ -92,7 +92,7 @@ export function DataTable({ mode, points }: { mode: Mode; points: IoTRawPoint[] 
         </Button>
       </div>
 
-      <div className="overflow-auto rounded-md border border-zinc-200">
+      <div className="min-h-0 flex-1 overflow-auto rounded-md border border-zinc-200">
         <table className="min-w-full text-left text-sm">
           <thead className="sticky top-0 bg-zinc-50">
             {table.getHeaderGroups().map((hg) => (
@@ -126,7 +126,7 @@ export function DataTable({ mode, points }: { mode: Mode; points: IoTRawPoint[] 
         </table>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex shrink-0 items-center justify-between">
         <div className="text-xs text-zinc-600">
           Page {table.getState().pagination.pageIndex + 1} / {table.getPageCount() || 1}
         </div>
