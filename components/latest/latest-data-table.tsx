@@ -13,9 +13,16 @@ import {
 } from "@tanstack/react-table";
 import { useEffect, useMemo, useState } from "react";
 
-function display(v: unknown) {
-  if (v === null || v === undefined || v === "") return "N/A";
+const NA_TEXT = "N/A";
+
+function displayText(v: unknown) {
+  if (v === null || v === undefined || v === "") return NA_TEXT;
   return String(v);
+}
+
+function renderCellValue(v: unknown) {
+  const text = displayText(v);
+  return text === NA_TEXT ? <span className="text-red-600">{NA_TEXT}</span> : text;
 }
 
 const DATE_FMT = new Intl.DateTimeFormat("en-US", {
@@ -65,8 +72,8 @@ function unitFromDescription(desc: unknown): string | undefined {
 }
 
 function displayLatestValue(row: LatestDataRow) {
-  const v = display(row.latestValue);
-  if (v === "N/A") return v;
+  const v = displayText(row.latestValue);
+  if (v === NA_TEXT) return v;
   const unit = unitFromDescription(row.description);
   return unit ? `${v} ${unit}` : v;
 }
@@ -81,16 +88,16 @@ export function LatestDataTable({ rows, totalRows }: { rows: LatestDataRow[]; to
 
   const columns = useMemo<ColumnDef<LatestDataRow>[]>(
     () => [
-      { accessorKey: "device", header: "Device", cell: (info) => display(info.getValue()) },
-      { accessorKey: "sensor", header: "Sensor", cell: (info) => display(info.getValue()) },
-      { accessorKey: "description", header: "Description", cell: (info) => display(info.getValue()) },
+      { accessorKey: "device", header: "Device", cell: (info) => renderCellValue(info.getValue()) },
+      { accessorKey: "sensor", header: "Sensor", cell: (info) => renderCellValue(info.getValue()) },
+      { accessorKey: "description", header: "Description", cell: (info) => renderCellValue(info.getValue()) },
       {
         accessorKey: "latestValue",
         header: "Latest Value",
-        cell: (info) => displayLatestValue(info.row.original)
+        cell: (info) => renderCellValue(displayLatestValue(info.row.original))
       },
-      { accessorKey: "timestamp", header: "Timestamp", cell: (info) => displayTime(info.getValue(), mounted) },
-      { accessorKey: "queriedAt", header: "Queried At", cell: (info) => displayTime(info.getValue(), mounted) }
+      { accessorKey: "timestamp", header: "Timestamp", cell: (info) => renderCellValue(displayTime(info.getValue(), mounted)) },
+      { accessorKey: "queriedAt", header: "Queried At", cell: (info) => renderCellValue(displayTime(info.getValue(), mounted)) }
     ],
     [mounted]
   );
@@ -142,12 +149,12 @@ export function LatestDataTable({ rows, totalRows }: { rows: LatestDataRow[]; to
       <div className="overflow-auto rounded-md border border-zinc-200 bg-white">
         <table className="w-full table-fixed text-left text-sm">
           <colgroup>
-            <col style={{ width: "8rem" }} /> {/* Device */}
-            <col style={{ width: "16rem" }} /> {/* Sensor */}
+            <col style={{ width: "6rem" }} /> {/* Device */}
+            <col style={{ width: "12rem" }} /> {/* Sensor */}
             <col /> {/* Description (fills remaining space) */}
             <col style={{ width: "10rem" }} /> {/* Latest Value */}
-            <col style={{ width: "13rem" }} /> {/* Timestamp */}
-            <col style={{ width: "13rem" }} /> {/* Queried At */}
+            <col style={{ width: "12rem" }} /> {/* Timestamp */}
+            <col style={{ width: "12rem" }} /> {/* Queried At */}
           </colgroup>
           <thead className="sticky top-0 bg-zinc-50">
             {table.getHeaderGroups().map((hg) => (
