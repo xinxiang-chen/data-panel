@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -360,9 +361,11 @@ export function ChatAgentPage() {
                             labelFormatter={(label) => fmtPacificTime(Number(label))}
                             formatter={(value: any) => [value, historyMeta?.unit ? `Value (${historyMeta.unit})` : "Value"]}
                           />
+                          <Legend />
                           <Line
                             type="monotone"
                             dataKey="value"
+                            name={historyMeta?.sensorName ?? "Value"}
                             stroke="#18181b"
                             strokeWidth={2}
                             dot={false}
