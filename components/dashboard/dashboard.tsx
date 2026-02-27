@@ -104,7 +104,7 @@ export function DashboardPage() {
               </Link>
               <span className="text-zinc-300">/</span>
               <Link className="hover:text-zinc-900" href="/chat-agent">
-                Chat Agent
+                🤖 Agent Preview
               </Link>
             </nav>
           </div>

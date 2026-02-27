@@ -149,7 +149,7 @@ export function LatestDataTable({ rows, totalRows }: { rows: LatestDataRow[]; to
       <div className="overflow-auto rounded-md border border-zinc-200 bg-white">
         <table className="w-full table-fixed text-left text-sm">
           <colgroup>
-            <col style={{ width: "6rem" }} /> {/* Device */}
+            <col style={{ width: "7rem" }} /> {/* Device */}
             <col style={{ width: "12rem" }} /> {/* Sensor */}
             <col /> {/* Description (fills remaining space) */}
             <col style={{ width: "10rem" }} /> {/* Latest Value */}
