@@ -32,6 +32,13 @@ type HistoryPoint = {
   timestamp: string;
 };
 
+type SensorMeta = {
+  deviceName?: string;
+  sensorName?: string;
+  sensorDescription?: string;
+  unit?: string;
+};
+
 function tryParseJson(value: unknown): unknown {
   if (typeof value !== "string") return value;
   const s = value.trim();
@@ -69,6 +76,47 @@ function pickValueAndTimestamp(value: unknown): HistoryPoint[] | null {
       timestamp: String(p?.timestamp ?? "")
     }))
     .filter((p) => p.timestamp.trim().length > 0);
+}
+
+function inferUnitFromDescription(desc?: string): string | undefined {
+  if (!desc) return undefined;
+  const parts = desc
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 1] : undefined;
+}
+
+function getSensorMeta(raw: unknown): SensorMeta | null {
+  const parsed = tryParseJson(raw) as any;
+
+  const steps =
+    parsed?.intermediateSteps ??
+    parsed?.output?.intermediateSteps ??
+    parsed?.data?.intermediateSteps ??
+    (Array.isArray(parsed) ? parsed : null);
+
+  if (!Array.isArray(steps)) return null;
+
+  const nameSteps = steps.filter((s: any) => s?.action?.tool === "getSensorName");
+  if (nameSteps.length === 0) return null;
+
+  const first = nameSteps[0];
+  const obs = first?.observation;
+  const firstObs = Array.isArray(obs) ? obs[0] : obs;
+
+  const obsParsed = parsePossiblyStringifiedJson(firstObs) as any;
+  const firstItem = Array.isArray(obsParsed) ? obsParsed[0] : obsParsed;
+  const output = firstItem?.output ?? null;
+
+  if (!output || typeof output !== "object") return null;
+
+  const deviceName = output.device_name ? String(output.device_name) : undefined;
+  const sensorName = output.sensor_name ? String(output.sensor_name) : undefined;
+  const sensorDescription = output.sensor_description ? String(output.sensor_description) : undefined;
+  const unit = inferUnitFromDescription(sensorDescription);
+
+  return { deviceName, sensorName, sensorDescription, unit };
 }
 
 function getFirstHistoryObservation(raw: unknown): HistoryPoint[] | null {
@@ -124,6 +172,8 @@ export function ChatAgentPage() {
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState<HistoryPoint[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyMeta, setHistoryMeta] = useState<SensorMeta | null>(null);
+  const [historyHover, setHistoryHover] = useState<{ ts: number; value: number | null } | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -140,14 +190,26 @@ export function ChatAgentPage() {
   });
   const exampleQueries = exampleQueriesQuery.data?.queries ?? [];
 
+  const historyChartData = useMemo(() => {
+    if (!history) return [];
+    return history
+      .map((p) => {
+        const ts = Date.parse(p.timestamp);
+        return Number.isFinite(ts) ? { ts, value: p.value } : null;
+      })
+      .filter(Boolean) as Array<{ ts: number; value: number | null }>;
+  }, [history]);
+
   const sendMutation = useMutation({
     mutationFn: async (message: string) => {
       return await apiSendChatMessage({ message, sessionId });
     },
     onSuccess: (data) => {
       const cleaned = getFirstHistoryObservation(data.raw);
+      const meta = getSensorMeta(data.raw);
       if (cleaned && cleaned.length > 0) {
         setHistory(cleaned);
+        setHistoryMeta(meta);
         setHistoryOpen(true);
         // Debug helper: surface tool output in browser console.
         console.log("getHistoryData observation[0] cleaned:", cleaned);
@@ -239,17 +301,34 @@ export function ChatAgentPage() {
                   <div className="flex h-full flex-col">
                     <div className="border-b border-zinc-200 pl-6 px-3 py-2 text-xs font-semibold text-zinc-900">
                       History Graph
+                      {historyMeta?.sensorName ? (
+                        <span className="font-normal text-zinc-600">
+                          {" "}
+                          · {historyMeta.sensorName}
+                          {historyMeta.unit ? ` (${historyMeta.unit})` : ""}
+                        </span>
+                      ) : null}
+                      {historyHover ? (
+                        <span className="ml-2 font-normal text-zinc-600">
+                          · {fmtPacificTime(historyHover.ts)}:{" "}
+                          <span className="font-medium text-zinc-900">
+                            {historyHover.value ?? "—"}
+                          </span>
+                        </span>
+                      ) : null}
                     </div>
                     <div className="flex-1 min-h-0 p-2">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart
-                          data={history
-                            .map((p) => {
-                              const ts = Date.parse(p.timestamp);
-                              return Number.isFinite(ts) ? { ts, value: p.value } : null;
-                            })
-                            .filter(Boolean) as any}
+                          data={historyChartData as any}
                           margin={{ top: 10, right: 12, left: 0, bottom: 10 }}
+                          onMouseMove={(e: any) => {
+                            const payload = e?.activePayload?.[0]?.payload;
+                            if (payload && typeof payload.ts === "number") {
+                              setHistoryHover({ ts: payload.ts, value: payload.value ?? null });
+                            }
+                          }}
+                          onMouseLeave={() => setHistoryHover(null)}
                         >
                           <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
                           <XAxis
@@ -262,14 +341,32 @@ export function ChatAgentPage() {
                             minTickGap={20}
                             tickFormatter={(v) => fmtPacificTime(Number(v))}
                           />
-                          <YAxis width={44} />
-                          <Tooltip labelFormatter={(label) => fmtPacificTime(Number(label))} />
+                          <YAxis
+                            width={54}
+                            label={
+                              historyMeta?.unit
+                                ? {
+                                    value: historyMeta.unit,
+                                    angle: -90,
+                                    position: "insideLeft",
+                                    offset: 10
+                                  }
+                                : undefined
+                            }
+                          />
+                          <Tooltip
+                            wrapperStyle={{ pointerEvents: "none" }}
+                            cursor={{ stroke: "#a1a1aa", strokeDasharray: "3 3" }}
+                            labelFormatter={(label) => fmtPacificTime(Number(label))}
+                            formatter={(value: any) => [value, historyMeta?.unit ? `Value (${historyMeta.unit})` : "Value"]}
+                          />
                           <Line
                             type="monotone"
                             dataKey="value"
                             stroke="#18181b"
                             strokeWidth={2}
                             dot={false}
+                            activeDot={{ r: 4 }}
                             isAnimationActive={false}
                           />
                         </LineChart>
