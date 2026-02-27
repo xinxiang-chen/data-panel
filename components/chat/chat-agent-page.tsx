@@ -390,28 +390,32 @@ export function ChatAgentPage() {
                             tickCount={5}
                             interval="preserveStartEnd"
                             minTickGap={20}
+                            tick={{ fontSize: 13 }}
                             tickFormatter={(v) => fmtPacificTime(Number(v))}
                           />
                           <YAxis
                             width={54}
+                            tick={{ fontSize: 13 }}
                             label={
                               historyMeta?.unit
                                 ? {
                                     value: historyMeta.unit,
                                     angle: -90,
                                     position: "insideLeft",
-                                    offset: 10
+                                    offset: 10,
+                                    style: { fontSize: 13 }
                                   }
                                 : undefined
                             }
                           />
                           <Tooltip
                             wrapperStyle={{ pointerEvents: "none" }}
+                            contentStyle={{ fontSize: 13 }}
                             cursor={{ stroke: "#a1a1aa", strokeDasharray: "3 3" }}
                             labelFormatter={(label) => fmtPacificTime(Number(label))}
                             formatter={(value: any) => [value, historyMeta?.unit ? `Value (${historyMeta.unit})` : "Value"]}
                           />
-                          <Legend />
+                          <Legend wrapperStyle={{ fontSize: 13 }} />
                           {historyStats.avg != null ? (
                             <Line
                               type="monotone"

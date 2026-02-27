@@ -71,6 +71,16 @@ function fmtNumber(n: number | null, digits = 3) {
   return String(Number(n.toFixed(digits)));
 }
 
+function formatTick(v: unknown) {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return "";
+  const abs = Math.abs(n);
+  if (abs >= 1000) return String(Math.round(n));
+  if (abs >= 100) return String(Number(n.toFixed(1)));
+  if (abs >= 1) return String(Number(n.toFixed(2)));
+  return String(Number(n.toFixed(4)));
+}
+
 export function SensorLineChart({
   mode,
   points,
@@ -174,28 +184,32 @@ export function SensorLineChart({
             tickCount={6}
             interval="preserveStartEnd"
             minTickGap={24}
+            tick={{ fontSize: 13 }}
             tickFormatter={(v) => fmtPacificTime(Number(v))}
           />
           <YAxis
-            tickFormatter={(v) => String(v)}
+            tickFormatter={formatTick}
             width={50}
             domain={yDomain ?? ["auto", "auto"]}
+            tick={{ fontSize: 13 }}
             label={
               unit
                 ? {
                     value: unit,
                     angle: -90,
                     position: "insideLeft",
-                    offset: 10
+                    offset: 10,
+                    style: { fontSize: 13 }
                   }
                 : undefined
             }
           />
           <Tooltip
-            formatter={(value: any, name: any) => [value, String(name)]}
+            wrapperStyle={{ fontSize: 13 }}
+            formatter={(value: any, name: any) => [formatTick(value), String(name)]}
             labelFormatter={(label) => fmtPacificTime(Number(label))}
           />
-          <Legend />
+          <Legend wrapperStyle={{ fontSize: 15 }} />
           {stats.avg != null ? (
             <Line
               type="monotone"
