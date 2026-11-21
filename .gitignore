@@ -143,3 +143,9 @@ scripts/json/*
 
 # Others
 .DS_Store
+
+# Backend
+.venv/
+__pycache__/
+.ruff_cache/
+docs/
