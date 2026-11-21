@@ -148,13 +148,17 @@ export function LatestDataTable({ rows, totalRows }: { rows: LatestDataRow[]; to
 
       <div className="overflow-auto rounded-md border border-zinc-200 bg-white">
         <table className="w-full table-fixed text-left text-sm">
+          {/* Column order: Device, Sensor, Description (fills remaining space),
+              Latest Value, Timestamp, Queried At. Keep <col> tags on their own lines
+              with no trailing comments: `<col /> {...}` adds a whitespace text node,
+              which is invalid inside <colgroup> (React logs a DOM-nesting error). */}
           <colgroup>
-            <col style={{ width: "7rem" }} /> {/* Device */}
-            <col style={{ width: "12rem" }} /> {/* Sensor */}
-            <col /> {/* Description (fills remaining space) */}
-            <col style={{ width: "10rem" }} /> {/* Latest Value */}
-            <col style={{ width: "12rem" }} /> {/* Timestamp */}
-            <col style={{ width: "12rem" }} /> {/* Queried At */}
+            <col style={{ width: "7rem" }} />
+            <col style={{ width: "12rem" }} />
+            <col />
+            <col style={{ width: "10rem" }} />
+            <col style={{ width: "12rem" }} />
+            <col style={{ width: "12rem" }} />
           </colgroup>
           <thead className="sticky top-0 bg-zinc-50">
             {table.getHeaderGroups().map((hg) => (
