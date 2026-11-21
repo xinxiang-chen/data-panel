@@ -16,3 +16,7 @@ class DeviceNotFound(NotFoundError):
 
 class SensorNotFound(NotFoundError):
     """No sensor with the given name (or it does not belong to the device)."""
+
+
+class InvalidTimeRange(ValueError):
+    """Query time range is invalid: naive datetime, start >= end, or span too long."""

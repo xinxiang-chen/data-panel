@@ -4,12 +4,18 @@ All SQL lives here. Functions take an AsyncSession and return API schema objects
 so they can be reused outside HTTP routes (e.g. by the Phase 3 chat agent's tools).
 """
 
+from datetime import datetime, timedelta
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import DeviceNotFound
-from app.models import Device, Sensor
-from app.schemas import Attributes, IoTDevice, IoTSensor
+from app.errors import DeviceNotFound, InvalidTimeRange, SensorNotFound
+from app.models import Device, Reading, Sensor
+from app.schemas import Attributes, IoTDevice, IoTRawPoint, IoTSensor
+
+# One raw query may span at most one month. This mirrors the original API and is
+# why the frontend proxy splits long raw ranges by UTC month.
+MAX_RAW_SPAN = timedelta(days=31)
 
 
 def _device_to_schema(device: Device) -> IoTDevice:
@@ -57,3 +63,62 @@ async def list_device_sensors(
         select(Sensor).where(Sensor.device_id == device.id).order_by(Sensor.name)
     )
     return [_sensor_to_schema(s) for s in sensors]
+
+
+async def _get_sensor(
+    session: AsyncSession, device_name: str, sensor_name: str
+) -> Sensor:
+    """The sensor named `sensor_name` that belongs to device `device_name`.
+
+    Matching on both prevents /devices/A/sensors/<sensor of B>/data from returning
+    data. An unknown device and an unknown sensor both raise SensorNotFound, which
+    the API maps to the original API's 404 {"errorCode": "TableNotFound"}.
+    """
+    sensor = await session.scalar(
+        select(Sensor)
+        .join(Sensor.device)
+        .where(Device.name == device_name, Sensor.name == sensor_name)
+    )
+    if sensor is None:
+        raise SensorNotFound(f"{device_name}/{sensor_name}")
+    return sensor
+
+
+def _validate_range(start: datetime, end: datetime, max_span: timedelta) -> None:
+    if start.tzinfo is None or end.tzinfo is None:
+        raise InvalidTimeRange(
+            "startDate and endDate must include a time zone (e.g. a trailing 'Z')"
+        )
+    if start >= end:
+        raise InvalidTimeRange("startDate must be earlier than endDate")
+    if end - start > max_span:
+        raise InvalidTimeRange(f"Time range may not exceed {max_span.days} days")
+
+
+async def get_raw_points(
+    session: AsyncSession,
+    device_name: str,
+    sensor_name: str,
+    start: datetime,
+    end: datetime,
+) -> list[IoTRawPoint]:
+    """Raw readings with start <= ts <= end (both inclusive), oldest first."""
+    _validate_range(start, end, MAX_RAW_SPAN)
+    sensor = await _get_sensor(session, device_name, sensor_name)
+
+    # Several columns per row -> execute() (scalars() would keep only the first column).
+    # Selecting just these columns skips building ORM objects for many rows.
+    # The WHERE clause is served by the (sensor_id, ts) primary-key index.
+    result = await session.execute(
+        select(Reading.ts, Reading.value, Reading.quality)
+        .where(
+            Reading.sensor_id == sensor.id,
+            Reading.ts >= start,
+            Reading.ts <= end,
+        )
+        .order_by(Reading.ts)
+    )
+    return [
+        IoTRawPoint(value=row.value, quality=row.quality, timestamp=row.ts)
+        for row in result
+    ]
