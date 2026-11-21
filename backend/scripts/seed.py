@@ -1,143 +1,164 @@
-"""Seed the database with a small demo catalog and 7 days of synthetic readings.
+"""Load the Demo Hall catalog and backfill simulated history.
 
 Run from backend/:
-    uv run python -m scripts.seed
+    uv run python -m scripts.seed --reset              # wipe and backfill 90 days
+    uv run python -m scripts.seed --reset --days 30
+    uv run python -m scripts.seed --reset --method insert   # benchmark vs COPY
 
-Dev-only: it TRUNCATEs all tables first, so re-running always gives the same result.
-Values are a simple daily sine wave + noise; realistic physics comes in Phase 2.
+Readings come from app.simulator.generator.generate_day(): the same function the
+live worker uses, so backfilled history and live data line up exactly. After
+changing a model, re-run with --reset so history matches the new code.
+
+Without --reset the script refuses to touch a database that already has devices.
 """
 
+import argparse
 import asyncio
-import math
-import random
-from datetime import UTC, datetime, timedelta
+import sys
+import time
+from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import insert, text
+from sqlalchemy import func, insert, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import SessionLocal, engine
 from app.models import Device, Reading, Sensor
+from app.simulator.catalog import CATALOG
+from app.simulator.clock import local_date
+from app.simulator.generator import generate_day
 
-INTERVAL = timedelta(minutes=10)
-DAYS = 7
-POINTS_PER_SENSOR = DAYS * 24 * 60 // 10  # 1008
-GOOD = "QUALITY_GOOD+OK+LIMIT_OK"
-BAD = "QUALITY_BAD"
-OFFLINE_RATE = 0.01  # ~1% of points are null, to exercise the frontend's N/A styling
-SEED = 42
-
-# Fictional building "Demo Hall" (DH_*). Each sensor: (suffix, description, unit, base, amplitude, noise)
-CATALOG = [
-    {
-        "name": "DH_AHU1",
-        "display_name": "Air Handling Unit 1",
-        "description": "Rooftop AHU serving floors 1-2",
-        "kind": "ahu",
-        "sensors": [
-            ("SaTemp", "Supply Air Temperature, Analog Input, °F", "°F", 58, 3, 0.3),
-            ("SaRh", "Supply Air Humidity, Analog Input, %RH", "%RH", 50, 8, 1.0),
-            ("FanSpeed", "Supply Fan Speed, Analog Output, %", "%", 70, 20, 2.0),
-            ("SaPressure",
-                "Supply Duct Static Pressure, Analog Input, inWC",
-                "inWC",
-                1.5,
-                0.3,
-                0.05,
-            ),
-        ],
-    },
-    {
-        "name": "DH_VAV101",
-        "display_name": "VAV Box 101",
-        "description": "Variable air volume box, room 101",
-        "kind": "vav",
-        "sensors": [
-            ("RoomTemp", "Room Temperature, Analog Input, °F", "°F", 71, 2, 0.2),
-            ("Airflow", "Discharge Airflow, Analog Input, CFM", "CFM", 400, 150, 15),
-            ("Damper", "Damper Position, Analog Output, %", "%", 50, 30, 3),
-            ("Setpoint", "Room Temperature Setpoint, Analog Value, °F", "°F", 72, 0, 0),
-        ],
-    },
-]
+COLUMNS = ("sensor_id", "ts", "value", "quality")
+Row = tuple[int, datetime, float | None, str]
 
 
-def floor_to_interval(dt: datetime, interval: timedelta) -> datetime:
-    step = int(interval.total_seconds())
-    return datetime.fromtimestamp(int(dt.timestamp()) // step * step, tz=UTC)
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument(
+        "--days", type=int, default=90, help="local days to backfill (default 90)"
+    )
+    p.add_argument("--reset", action="store_true", help="TRUNCATE all tables first")
+    p.add_argument(
+        "--method",
+        choices=("copy", "insert"),
+        default="copy",
+        help="bulk write method (default copy; insert is for benchmarking)",
+    )
+    return p.parse_args()
 
 
-def sine_value(ts: datetime, params: dict, rng: random.Random) -> float:
-    """Daily cycle: peaks at 12:00 UTC, lowest at 00:00 UTC.
-
-    Uses UTC hours for simplicity; Phase 2 should use the building's local time zone.
-    """
-    hour = ts.hour + ts.minute / 60
-    daily = math.sin(2 * math.pi * (hour - 6) / 24)
-    return params["base"] + params["amplitude"] * daily + rng.gauss(0, params["noise"])
-
-
-def build_readings(sensors: list[Sensor], end: datetime) -> list[dict]:
-    rng = random.Random(SEED)
-    timestamps = [end - INTERVAL * i for i in range(POINTS_PER_SENSOR - 1, -1, -1)]
-    rows: list[dict] = []
-    for sensor in sensors:
-        for ts in timestamps:
-            if rng.random() < OFFLINE_RATE:
-                value, quality = None, BAD
-            else:
-                value, quality = round(sine_value(ts, sensor.params, rng), 3), GOOD
-            rows.append(
-                {"sensor_id": sensor.id, "ts": ts, "value": value, "quality": quality}
-            )
-    return rows
-
-
-async def main() -> None:
-    end = floor_to_interval(datetime.now(UTC), INTERVAL)
-
-    async with SessionLocal() as session:
-        # 1. Reset (all three tables in one statement so FK constraints allow it).
-        await session.execute(
-            text("TRUNCATE readings, sensors, devices RESTART IDENTITY")
+async def write_catalog(session: AsyncSession) -> dict[str, int]:
+    """Insert devices and sensors; return {sensor name: sensor id}."""
+    sensors: list[Sensor] = []
+    for spec in CATALOG:
+        device = Device(
+            name=spec.name,
+            display_name=spec.display_name,
+            description=spec.description,
+            kind=spec.kind,
         )
-
-        # 2. Small catalog -> ORM objects; flush() sends INSERTs so ids are assigned.
-        sensors: list[Sensor] = []
-        for d in CATALOG:
-            device = Device(
-                name=d["name"],
-                display_name=d["display_name"],
-                description=d["description"],
-                kind=d["kind"],
+        session.add(device)
+        for s in spec.sensors:
+            sensor = Sensor(
+                device=device,
+                name=s.name,
+                description=s.description,
+                unit=s.unit,
+                model_type=s.model_type,
+                params=dict(s.params),
             )
-            session.add(device)
-            for suffix, description, unit, base, amplitude, noise in d["sensors"]:
-                sensor = Sensor(
-                    device=device,
-                    name=f"{d['name']}_{suffix}",
-                    description=description,
-                    unit=unit,
-                    model_type="sine",
-                    params={"base": base, "amplitude": amplitude, "noise": noise},
-                )
-                session.add(sensor)
-                sensors.append(sensor)
-        await session.flush()
+            session.add(sensor)
+            sensors.append(sensor)
+    await session.flush()  # assigns ids
+    return {s.name: s.id for s in sensors}
 
-        # 3. Bulk readings -> Core insert with a list of dicts (batched multi-row INSERTs).
-        rows = build_readings(sensors, end)
-        await session.execute(insert(Reading), rows)
 
-        # 4. Single commit: all-or-nothing.
-        await session.commit()
+async def copy_rows(session: AsyncSession, rows: list[Row]) -> None:
+    """Postgres COPY via asyncpg: streams rows in binary, far faster than INSERT.
 
-    await engine.dispose()
-
-    nulls = sum(r["value"] is None for r in rows)
-    print(
-        f"seeded {len(CATALOG)} devices, {len(sensors)} sensors, {len(rows)} readings "
-        f"({nulls} offline) from {rows[0]['ts'].isoformat()} to {end.isoformat()}"
+    Runs on the session's own connection, inside its open transaction, so the
+    whole backfill still commits (or rolls back) as one unit.
+    """
+    conn = await session.connection()
+    raw = await conn.get_raw_connection()
+    await raw.driver_connection.copy_records_to_table(
+        "readings", records=rows, columns=list(COLUMNS)
     )
 
 
+async def insert_rows(session: AsyncSession, rows: list[Row]) -> None:
+    """Multi-row INSERT (SQLAlchemy insertmanyvalues). Kept for comparison."""
+    await session.execute(
+        insert(Reading), [dict(zip(COLUMNS, r, strict=True)) for r in rows]
+    )
+
+
+def rows_for_day(ids: dict[str, int], day: date, until: datetime) -> list[Row]:
+    return [
+        (ids[s.name], ts, v, q)
+        for spec in CATALOG
+        for s in spec.sensors
+        for ts, v, q in generate_day(s, day)
+        if ts <= until  # today: only samples that already "happened"
+    ]
+
+
+async def main() -> int:
+    args = parse_args()
+    write = copy_rows if args.method == "copy" else insert_rows
+    now = datetime.now(UTC)
+    today = local_date(now)
+    days = [today - timedelta(days=i) for i in range(args.days - 1, -1, -1)]
+
+    async with SessionLocal() as session:
+        has_data = await session.scalar(select(func.count()).select_from(Device))
+        if has_data and not args.reset:
+            print(
+                "Database already has devices. Re-run with --reset to wipe and backfill."
+            )
+            return 1
+        if args.reset:
+            await session.execute(
+                text("TRUNCATE readings, sensors, devices RESTART IDENTITY")
+            )
+
+        ids = await write_catalog(session)
+        print(f"catalog: {len(CATALOG)} devices, {len(ids)} sensors")
+        print(
+            f"backfilling {len(days)} local days ({days[0]} .. {days[-1]}) via {args.method}"
+        )
+
+        total = nulls = 0
+        gen_s = write_s = 0.0
+        for i, day in enumerate(days, 1):
+            t0 = time.perf_counter()
+            rows = rows_for_day(ids, day, now)
+            t1 = time.perf_counter()
+            if rows:
+                await write(session, rows)
+            t2 = time.perf_counter()
+            gen_s += t1 - t0
+            write_s += t2 - t1
+            total += len(rows)
+            nulls += sum(r[2] is None for r in rows)
+            if i % 10 == 0 or i == len(days):
+                print(f"  {day}  {i:>3}/{len(days)} days  {total:>9,} rows")
+
+        t0 = time.perf_counter()
+        await session.commit()
+        commit_s = time.perf_counter() - t0
+
+        # Refresh planner statistics after a bulk load.
+        await session.execute(text("ANALYZE readings"))
+        await session.commit()
+
+    await engine.dispose()
+    print(
+        f"done: {total:,} readings ({nulls / max(total, 1):.2%} null) | "
+        f"generate {gen_s:.1f}s, {args.method} {write_s:.1f}s, commit {commit_s:.1f}s "
+        f"({total / max(write_s, 1e-9):,.0f} rows/s written)"
+    )
+    return 0
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))
