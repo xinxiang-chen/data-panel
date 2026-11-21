@@ -20,3 +20,7 @@ class SensorNotFound(NotFoundError):
 
 class InvalidTimeRange(ValueError):
     """Query time range is invalid: naive datetime, start >= end, or span too long."""
+
+
+class InvalidInterval(ValueError):
+    """Unsupported rollup interval (allowed: 1h 2h 3h 4h 6h 8h 12h 24h)."""

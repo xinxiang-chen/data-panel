@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.iot import router as iot_router
 from app.db import engine, get_session
-from app.errors import DeviceNotFound, InvalidTimeRange, SensorNotFound
+from app.errors import (
+    DeviceNotFound,
+    InvalidInterval,
+    InvalidTimeRange,
+    SensorNotFound,
+)
 from app.schemas import ErrorBody
 
 
@@ -50,6 +55,14 @@ async def invalid_time_range_handler(
     request: Request, exc: InvalidTimeRange
 ) -> JSONResponse:
     body = ErrorBody(error_code="InvalidTimeRange", message=str(exc))
+    return JSONResponse(status_code=400, content=body.model_dump(mode="json"))
+
+
+@app.exception_handler(InvalidInterval)
+async def invalid_interval_handler(
+    request: Request, exc: InvalidInterval
+) -> JSONResponse:
+    body = ErrorBody(error_code="InvalidInterval", message=str(exc))
     return JSONResponse(status_code=400, content=body.model_dump(mode="json"))
 
 
