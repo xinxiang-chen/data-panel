@@ -17,3 +17,7 @@ dependencies = [
 dev = [
     "ruff>=0.17.6",
 ]
+
+[tool.ruff]
+# Alembic-generated migrations are written once and not hand-maintained.
+extend-exclude = ["alembic/versions"]
