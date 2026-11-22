@@ -23,7 +23,7 @@ services:
   backend:
     profiles: [app]
     build: ./backend
-    image: data-panel-backend:local
+    image: digital-twin-data-panel-backend:local
     container_name: sensor-backend
     environment:
       # Inside the compose network the database is "db" on its own port 5432.

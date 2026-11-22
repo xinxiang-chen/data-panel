@@ -8,7 +8,7 @@
 #
 # Only Caddy publishes ports. The database and backend are reachable only on
 # the compose network, so the API is exposed solely over HTTPS via Caddy.
-name: data-panel
+name: digital-twin-data-panel
 
 services:
   db:
@@ -29,7 +29,7 @@ services:
   backend:
     # Built on the server for now; CD will switch BACKEND_IMAGE to a GHCR tag.
     build: ../backend
-    image: ${BACKEND_IMAGE:-data-panel-backend:local}
+    image: ${BACKEND_IMAGE:-digital-twin-data-panel-backend:local}
     restart: unless-stopped
     environment:
       APP_ENV: production # refuses to start with a weak API_TOKEN

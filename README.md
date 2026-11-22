@@ -1,6 +1,6 @@
-# Sensor Data Panel
+# Digital Twin Data Panel
 
-[![CI](https://github.com/xinxiang-chen/data-panel/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xinxiang-chen/data-panel/actions/workflows/ci.yml)
+[![CI](https://github.com/xinxiang-chen/digital-twin-data-panel/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xinxiang-chen/digital-twin-data-panel/actions/workflows/ci.yml)
 
 A full-stack dashboard for building IoT sensor data: a Next.js frontend backed by a
 FastAPI simulator that serves an API compatible with the original building IoT API,

@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await engine.dispose()
 
 
-app = FastAPI(title="Sensor Simulator", lifespan=lifespan)
+app = FastAPI(title="Digital Twin Data Panel API", lifespan=lifespan)
 app.include_router(iot_router)
 
 

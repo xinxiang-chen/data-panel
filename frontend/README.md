@@ -1,4 +1,4 @@
-## Data Panel (frontend)
+## Digital Twin Data Panel (frontend)
 
 > This is the `frontend/` package of the monorepo. All commands and paths below are
 > relative to `frontend/`. See the [root README](../README.md) for the full stack

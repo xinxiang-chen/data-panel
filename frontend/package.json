@@ -1,5 +1,5 @@
 {
-  "name": "data-panel",
+  "name": "digital-twin-data-panel",
   "version": "1.0.0",
   "description": "1. Customized the data searching function, mapping with specific API calls, e.g.     1. support data range for data retrival (API supported)     2. support if get roll up data (API supported)     3. support choosing different devices, or sensors(sensor including in devices), a filter 2. support table/figure view 3. AI Agent support NL queries and summarize (not for this phase)",
   "main": "index.js",
@@ -14,15 +14,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xinxiang-chen/data-panel.git"
+    "url": "git+https://github.com/xinxiang-chen/digital-twin-data-panel.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/xinxiang-chen/data-panel/issues"
+    "url": "https://github.com/xinxiang-chen/digital-twin-data-panel/issues"
   },
-  "homepage": "https://github.com/xinxiang-chen/data-panel#readme",
+  "homepage": "https://github.com/xinxiang-chen/digital-twin-data-panel#readme",
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-table": "^8.21.3",
