@@ -14,21 +14,21 @@ import type { LatestDataRow } from "@/types/iot";
 const EMPTY_ROWS: LatestDataRow[] = [];
 
 export function LatestDataPage() {
-  const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Data Panel";
+  const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Demo Hall Dashboard";
   const [device, setDevice] = useState("");
   const [sensor, setSensor] = useState("");
   const [onlyHasValue, setOnlyHasValue] = useState(false);
 
+  // The simulator writes a new sample every 10 min (worker tops up every 60s),
+  // so poll once a minute while the tab is visible. Existing rows stay on
+  // screen during a refetch; only the "Updated" label changes.
   const q = useQuery({
     queryKey: ["latest-data"],
     queryFn: apiGetLatestData,
-    staleTime: Number.POSITIVE_INFINITY,
-    gcTime: Number.POSITIVE_INFINITY,
-    retry: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
-    refetchOnWindowFocus: false
+    refetchInterval: 60_000,
+    retry: false
   });
+  const updatedAt = q.dataUpdatedAt ? new Date(q.dataUpdatedAt).toLocaleTimeString() : "—";
 
   const rows = useMemo(() => q.data?.rows ?? EMPTY_ROWS, [q.data?.rows]);
 
@@ -87,8 +87,13 @@ export function LatestDataPage() {
               </Link>
             </nav>
           </div>
-          <div className="text-xs text-zinc-600">
-            Source: <span className="font-medium">{q.data?.source ?? "—"}</span>
+          <div className="flex items-center gap-3 text-xs text-zinc-600">
+            <span>
+              Updated: <span className="font-medium tabular-nums">{q.isFetching ? "refreshing…" : updatedAt}</span>
+            </span>
+            <span>
+              Source: <span className="font-medium">{q.data?.source ?? "—"}</span>
+            </span>
           </div>
         </div>
       </header>

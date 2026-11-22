@@ -33,7 +33,7 @@ function inferUnitFromDescription(desc?: string) {
 }
 
 export function DashboardPage() {
-  const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Data Panel";
+  const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Demo Hall Dashboard";
 
   const devicesQuery = useQuery({
     queryKey: ["devices"],

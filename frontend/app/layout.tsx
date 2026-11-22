@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Dashboard - GCS Living Lab",
-  description: "Dashboard for GCS Living Lab"
+  title: "Demo Hall Dashboard",
+  description: "Live sensor dashboard for Demo Hall, a simulated smart building"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -3,8 +3,8 @@
 /**
  * Extract device names from raw devices JSON.
  *
- * Input shape (example): [{ "name": "GCS_AHU1", ... }, ...]
- * Output shape: ["GCS_AHU1", "GCS_AHU2", ...]
+ * Input shape (example): [{ "name": "DH_AHU1", ... }, ...]
+ * Output shape: ["DH_AHU1", "DH_AHU2", ...]
  *
  * Usage:
  *   node scripts/extract-device-names.js

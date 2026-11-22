@@ -1,17 +1,17 @@
 [
   {
-    "name": "GCS_AHU5",
+    "name": "DH_AHU1",
     "sensors": [
       {
-        "name": "GCS_AHU5DaTemp",
-        "attributes": { "description": { "text": "Supply air Temperature, Analog Input, ºF" } },
+        "name": "DH_AHU1_SaTemp",
+        "attributes": { "description": { "text": "Supply Air Temperature, Analog Input, °F" } },
         "latestValue": "62.06",
         "latestTimestamp": "2026-02-15T17:40:08.201Z",
         "latestQueryTimestamp": "2026-02-15T17:41:35.121Z"
       },
       {
-        "name": "GCS_AHU5DaRh",
-        "attributes": { "description": { "text": "Discharge Air Humidity, Analog Input, RH" } },
+        "name": "DH_AHU1_SaRh",
+        "attributes": { "description": { "text": "Supply Air Humidity, Analog Input, %RH" } },
         "latestValue": null,
         "latestTimestamp": null,
         "latestQueryTimestamp": "2026-02-15T17:41:35.121Z"

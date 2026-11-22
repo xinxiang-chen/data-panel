@@ -39,7 +39,7 @@ PROJECT_ID=<your-project-id>
 API_TOKEN=<your-api-token>
 
 # App
-NEXT_PUBLIC_APP_NAME=GCS Living Lab Dashboard
+NEXT_PUBLIC_APP_NAME=Demo Hall Dashboard
 
 # n8n chat agent (optional)
 N8N_CHAT_WEBHOOK_URL=http://localhost:5678/webhook/<your-chat-trigger-path>
@@ -175,8 +175,8 @@ Output shape:
 ```json
 [
   {
-    "device_name": "GCS_AHU1",
-    "sensors": [{ "sensor_name": "GCS_AHU1DaTemp", "descprtion": "..." }]
+    "device_name": "DH_AHU1",
+    "sensors": [{ "sensor_name": "DH_AHU1_SaTemp", "descprtion": "..." }]
   }
 ]
 ```

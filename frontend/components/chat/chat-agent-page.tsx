@@ -181,7 +181,7 @@ function createSessionId() {
 }
 
 export function ChatAgentPage() {
-  const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Data Panel";
+  const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Demo Hall Dashboard";
   const [sessionId] = useState(() => createSessionId());
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState<HistoryPoint[] | null>(null);

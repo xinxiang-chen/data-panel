@@ -108,6 +108,8 @@ export function LatestDataTable({ rows, totalRows }: { rows: LatestDataRow[]; to
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    // Keep the current page when the 60s auto-refresh swaps in new rows.
+    autoResetPageIndex: false,
     initialState: { pagination: { pageSize: 100 } }
   });
 
@@ -147,7 +149,9 @@ export function LatestDataTable({ rows, totalRows }: { rows: LatestDataRow[]; to
       </div>
 
       <div className="overflow-auto rounded-md border border-zinc-200 bg-white">
-        <table className="w-full table-fixed text-left text-sm">
+        {/* min-w: the fixed columns alone are 53rem; below ~68rem the table
+            scrolls sideways instead of squeezing Description to zero width. */}
+        <table className="w-full min-w-[68rem] table-fixed text-left text-sm">
           {/* Column order: Device, Sensor, Description (fills remaining space),
               Latest Value, Timestamp, Queried At. Keep <col> tags on their own lines
               with no trailing comments: `<col /> {...}` adds a whitespace text node,
