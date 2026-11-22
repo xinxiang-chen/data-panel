@@ -67,7 +67,7 @@ jobs:
       - run: uv run pytest
       # The image the server runs; catches a broken Dockerfile before deploy.
       - name: Build Docker image
-        run: docker build --tag data-panel-backend:ci .
+        run: docker build --tag digital-twin-data-panel-backend:ci .
       - name: Validate compose files
         working-directory: .
         env: # dummy values: only syntax and interpolation are checked
