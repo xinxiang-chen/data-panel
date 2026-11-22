@@ -1,0 +1,104 @@
+# Lint, test and build on every PR to main and every push to main.
+# Each half of the monorepo only runs when its files changed; the final
+# "CI passed" job is the single check to require in branch protection.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: # manual run from the Actions tab: checks everything
+
+permissions:
+  contents: read
+
+# A newer push to the same branch/PR cancels the run still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # paths-filter lists PR files via the API
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+
+  backend:
+    name: Backend (ruff, pytest)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      # --locked: fail if uv.lock is out of date with pyproject.toml.
+      # The Python version comes from backend/.python-version.
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      # Unit tests only: no database or .env needed.
+      - run: uv run pytest
+
+  frontend:
+    name: Frontend (eslint, tsc, build)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      # No BASE_URL/API_TOKEN here: API routes are dynamic, so the build
+      # never calls the backend.
+      - run: npm run build
+
+  ci-ok:
+    name: CI passed
+    if: always()
+    needs: [changes, backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      # Skipped jobs (nothing changed on that side) count as passing;
+      # a failed or cancelled one does not.
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "changes=${{ needs.changes.result }} backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }}"
+          exit 1
+      - run: echo "All required checks passed."
