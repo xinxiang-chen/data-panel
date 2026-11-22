@@ -1,6 +1,7 @@
+import asyncio
+import contextlib
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -8,7 +9,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.iot import router as iot_router
-from app.db import engine, get_session
+from app.config import get_settings
+from app.db import SessionLocal, engine, get_session
 from app.errors import (
     DeviceNotFound,
     InvalidInterval,
@@ -16,13 +18,27 @@ from app.errors import (
     SensorNotFound,
 )
 from app.schemas import ErrorBody
+from app.simulator import worker
 
 
-@asynccontextmanager
+@contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # startup: nothing yet (the scheduler will start here in Phase 2)
+    settings = get_settings()
+    # startup: launch the live simulator in the background (same event loop).
+    task: asyncio.Task[None] | None = None
+    if settings.sim_enabled:
+        task = asyncio.create_task(
+            worker.run_forever(
+                SessionLocal, settings.sim_interval_s, settings.sim_max_catch_up_days
+            ),
+            name="simulator-worker",
+        )
     yield
-    # shutdown: close every pooled connection
+    # shutdown: stop the worker, then close every pooled connection.
+    if task is not None:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
     await engine.dispose()
 
 
@@ -69,9 +85,22 @@ async def invalid_interval_handler(
 @app.get("/healthz")
 async def healthz(
     session: Annotated[AsyncSession, Depends(get_session)],
-) -> dict[str, bool | str]:
+) -> dict[str, Any]:
     try:
         await session.execute(text("SELECT 1"))
     except Exception as exc:
         raise HTTPException(status_code=503, detail="database unavailable") from exc
-    return {"ok": True, "db": "up"}
+    s = worker.status
+    return {
+        "ok": True,
+        "db": "up",
+        "simulator": {
+            "enabled": s.enabled,
+            "intervalS": s.interval_s,
+            "ticks": s.ticks,
+            "lastTickAt": s.last_tick_at.isoformat() if s.last_tick_at else None,
+            "lastRows": s.last_rows,
+            "lastSkipped": s.last_skipped,
+            "lastError": s.last_error,
+        },
+    }
