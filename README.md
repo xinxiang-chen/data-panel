@@ -84,3 +84,29 @@ docker compose -f docker-compose.prod.yml exec backend python -m scripts.seed --
 
 With `APP_ENV=production` (set by the prod compose file) the backend refuses to start
 with a weak `API_TOKEN`, and `seed --reset` against a non-local database requires `--yes`.
+
+### Continuous deployment
+
+After CI passes on a push to `main`, [`deploy.yml`](.github/workflows/deploy.yml) checks
+whether the commit touched `backend/` or `deploy/`. If it did, it builds the backend image,
+pushes it to GHCR as `sha-<commit>` and `latest`, then connects to the VM over SSH and runs
+[`deploy/deploy.sh`](deploy/deploy.sh). The script:
+
+1. updates the checkout to the deployed commit;
+2. pulls the image;
+3. restarts the stack and waits for the healthchecks, rolling back to the previous image if
+   the new one never becomes healthy.
+
+Vercel deploys the frontend from the same pushes.
+
+To deploy or roll back by hand, run this on the server:
+
+```bash
+deploy/deploy.sh ghcr.io/<owner>/digital-twin-data-panel-backend:sha-<commit>
+```
+
+The workflow reads its settings from the `production` environment:
+
+- variables: `DEPLOY_HOST` (the API hostname, also used for SSH) and `DEPLOY_USER`
+- secrets: `DEPLOY_SSH_KEY` (a dedicated key) and `DEPLOY_KNOWN_HOSTS` (the output of
+  `ssh-keyscan -t ed25519 <host>`)

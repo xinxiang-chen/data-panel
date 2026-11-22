@@ -1,0 +1,145 @@
+# Continuous deployment of the backend to the VM.
+#
+# Runs after CI succeeds on a push to main. If that commit touched the backend
+# or deploy/, it builds the image, pushes it to GHCR and runs deploy/deploy.sh
+# on the server over SSH. The frontend is deployed by Vercel's Git integration.
+#
+# Setup (Settings -> Environments -> "production"):
+#   variables  DEPLOY_HOST  API hostname, e.g. api.example.com (also SSH host)
+#              DEPLOY_USER  SSH user in the docker group, e.g. ubuntu
+#              DEPLOY_PATH  optional; repo checkout on the server, relative to
+#                           the user's home (default digital-twin-data-panel)
+#   secrets    DEPLOY_SSH_KEY      private key of a dedicated deploy key pair
+#              DEPLOY_KNOWN_HOSTS  the server's host key: ssh-keyscan -t ed25519 <host>
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: # redeploy main by hand, even without backend changes
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer one waits instead of cancelling a deploy midway.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/digital-twin-data-panel-backend
+  # workflow_run: the commit CI tested. workflow_dispatch: the tip of main.
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  changes:
+    name: Detect backend changes
+    # Only pushes to main (a fork PR can also have a branch called "main").
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.diff.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 2
+      # HEAD^1 is main before this push (the first parent of a merge commit).
+      - id: diff
+        run: |
+          if [ "${{ github.event_name }}" = workflow_dispatch ] ||
+             ! git diff --quiet HEAD^1 HEAD -- backend deploy .github/workflows/deploy.yml; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+            echo "No backend changes in ${SHA::7}; nothing to deploy."
+          fi
+
+  build:
+    name: Build and push image
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.tag.outputs.image }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+      - id: tag
+        run: echo "image=${IMAGE}:sha-${SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          platforms: linux/amd64 # the VM's architecture
+          provenance: false # keep a single plain manifest in GHCR
+          tags: |
+            ${{ steps.tag.outputs.image }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ env.SHA }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+  deploy:
+    name: Deploy to VM
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://${{ vars.DEPLOY_HOST }}
+    permissions:
+      contents: read
+      packages: read # lets the server pull the image with this run's token
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || 'digital-twin-data-panel' }}
+      NEW_IMAGE: ${{ needs.build.outputs.image }}
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          remote() { ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" "$@"; }
+
+          # Move the checkout to the deployed commit so the compose files match the image.
+          remote "cd ~/$DEPLOY_PATH && git fetch --quiet origin main && git checkout --quiet main && git merge --quiet --ff-only $SHA"
+
+          # Let the server pull from GHCR with this run's short-lived token
+          # (sent over stdin, never on a command line); always log out after.
+          printf '%s\n' "$GHCR_TOKEN" | remote "docker login ghcr.io -u $ACTOR --password-stdin" >/dev/null
+          trap 'remote "docker logout ghcr.io" >/dev/null 2>&1 || true' EXIT
+
+          remote "cd ~/$DEPLOY_PATH && ./deploy/deploy.sh $NEW_IMAGE"
+
+      - name: Smoke test
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-all-errors "https://$DEPLOY_HOST/healthz"
