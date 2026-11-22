@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
+import { getChatWebhookUrl } from "@/lib/server/agent-config";
 
 type N8nSendMessageRequest = {
   action: "sendMessage";
   sessionId: string;
   chatInput: string;
 };
-
-function resolveWebhookUrl() {
-  const url = process.env.N8N_CHAT_WEBHOOK_URL;
-  return url && url.trim().length ? url.trim() : null;
-}
 
 function toText(value: unknown): string {
   if (typeof value === "string") return value;
@@ -35,12 +31,10 @@ function toText(value: unknown): string {
 }
 
 export async function POST(req: Request) {
-  const webhookUrl = resolveWebhookUrl();
+  const webhookUrl = getChatWebhookUrl();
   if (!webhookUrl) {
-    return NextResponse.json(
-      { error: "N8N_CHAT_WEBHOOK_URL is not configured in .env.local" },
-      { status: 500 }
-    );
+    // Not an error in our code: the agent just isn't deployed here (yet).
+    return NextResponse.json({ error: "Chat agent is not available yet" }, { status: 503 });
   }
 
   let input: { message?: string; sessionId?: string };
