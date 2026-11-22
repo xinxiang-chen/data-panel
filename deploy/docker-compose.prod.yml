@@ -27,7 +27,8 @@ services:
       retries: 20
 
   backend:
-    # Built on the server for now; CD will switch BACKEND_IMAGE to a GHCR tag.
+    # Built on the server by default; CD (deploy/deploy.sh) sets BACKEND_IMAGE
+    # in .env to a prebuilt GHCR tag instead.
     build: ../backend
     image: ${BACKEND_IMAGE:-digital-twin-data-panel-backend:local}
     restart: unless-stopped
