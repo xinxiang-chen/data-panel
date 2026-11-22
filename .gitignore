@@ -138,5 +138,14 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# API example
-scripts/json/*
+# API example (raw exports from the original building API; never commit)
+frontend/scripts/json/*
+
+# Others
+.DS_Store
+
+# Backend
+.venv/
+__pycache__/
+.ruff_cache/
+docs/

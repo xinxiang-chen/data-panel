@@ -1,0 +1,17 @@
+[
+  {
+    "name": "DH_AHU1_SaTemp",
+    "attributes": { "description": { "text": "Supply Air Temperature, Analog Input, °F" } },
+    "latestValue": "62.06",
+    "latestTimestamp": "2026-02-15T17:40:08.201Z",
+    "latestQuality": "QUALITY_GOOD+OK+LIMIT_OK"
+  },
+  {
+    "name": "DH_AHU1_SaRh",
+    "attributes": { "description": { "text": "Supply Air Humidity, Analog Input, %RH" } },
+    "latestValue": "61.625",
+    "latestTimestamp": "2026-02-15T17:40:08.201Z",
+    "latestQuality": "QUALITY_GOOD+OK+LIMIT_OK"
+  }
+]
+

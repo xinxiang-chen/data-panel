@@ -1,0 +1,63 @@
+[
+  {
+    "value": "48.93125",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T08:00:08.201Z"
+  },
+  {
+    "value": "49.20625",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T08:10:07.501Z"
+  },
+  {
+    "value": "48.61875",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T08:20:08.801Z"
+  },
+  {
+    "value": "47.175",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T08:30:08.101Z"
+  },
+  {
+    "value": "48.0125",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T08:40:08.501Z"
+  },
+  {
+    "value": "46.94375",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T08:50:07.901Z"
+  },
+  {
+    "value": "45.72501",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T09:00:08.301Z"
+  },
+  {
+    "value": "45.00625",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T09:10:07.801Z"
+  },
+  {
+    "value": "38.64375",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T09:20:07.901Z"
+  },
+  {
+    "value": "41.425",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T09:30:08.101Z"
+  },
+  {
+    "value": "44.98125",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T09:40:07.401Z"
+  },
+  {
+    "value": "45.65625",
+    "quality": "QUALITY_GOOD+OK+LIMIT_OK",
+    "timestamp": "2026-02-09T09:50:07.801Z"
+  }
+]
+
