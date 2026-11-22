@@ -12,7 +12,8 @@ with readings stored in PostgreSQL + TimescaleDB.
 |---|---|
 | [`frontend/`](frontend/) | Next.js app: dashboard, roll-ups, latest data, chat agent UI. See [frontend/README.md](frontend/README.md) |
 | [`backend/`](backend/) | FastAPI simulator: IoT-compatible API, SQLAlchemy models, Alembic migrations, seed script |
-| [`docker-compose.yml`](docker-compose.yml) | Local TimescaleDB (PostgreSQL 16) on host port 5433 |
+| [`docker-compose.yml`](docker-compose.yml) | Local TimescaleDB (PostgreSQL 16) on host port 5433; optional backend container |
+| [`deploy/`](deploy/) | Production stack for one VM: TimescaleDB + backend + Caddy (automatic HTTPS) |
 
 ```
 Browser ─► Next.js (frontend/) ── /api/* proxy ──► FastAPI (backend/) ──► Postgres + TimescaleDB
@@ -31,22 +32,22 @@ docker compose up -d
 **2. Backend** (from `backend/`)
 
 ```bash
-cp .env.example .env      # then fill in DATABASE_URL / PROJECT_ID / API_TOKEN
+cp .env.example .env      # defaults work with the compose database
 uv sync
 uv run alembic upgrade head
 uv run python -m scripts.seed
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-Example `.env` for local development:
+API docs: http://localhost:8000/docs
+
+Alternatively, run the backend in Docker instead of step 2's uvicorn (migrations run
+on container start; seed once if the database is empty):
 
 ```bash
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/sensor_sim
-PROJECT_ID=demo
-API_TOKEN=dev
+docker compose --profile app up -d --build
+docker compose exec backend python -m scripts.seed
 ```
-
-API docs: http://localhost:8000/docs
 
 **3. Frontend** (from `frontend/`)
 
@@ -66,3 +67,20 @@ API_TOKEN=dev
 
 Open http://localhost:3000. The header shows `Source: api` when data comes from the
 backend (it falls back to `mock` if the backend is unreachable).
+
+## Deployment
+
+The backend and database run on one small VM with
+[`deploy/docker-compose.prod.yml`](deploy/docker-compose.prod.yml); Caddy terminates
+HTTPS and is the only service exposed. The frontend is deployed to Vercel with
+`BASE_URL=https://<your API domain>` and the same `PROJECT_ID` / `API_TOKEN`.
+
+```bash
+cd deploy
+cp .env.example .env      # DOMAIN, POSTGRES_PASSWORD, API_TOKEN (openssl rand -hex 32)
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec backend python -m scripts.seed --days 90
+```
+
+With `APP_ENV=production` (set by the prod compose file) the backend refuses to start
+with a weak `API_TOKEN`, and `seed --reset` against a non-local database requires `--yes`.

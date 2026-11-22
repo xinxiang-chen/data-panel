@@ -1,3 +1,7 @@
+# Local development.
+#   docker compose up -d                  database only; run uvicorn --reload yourself
+#   docker compose --profile app up -d    database + backend container on :8000
+# Production lives in deploy/docker-compose.prod.yml.
 services:
   db:
     image: timescale/timescaledb-ha:pg16
@@ -15,6 +19,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  backend:
+    profiles: [app]
+    build: ./backend
+    image: data-panel-backend:local
+    container_name: sensor-backend
+    environment:
+      # Inside the compose network the database is "db" on its own port 5432.
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/sensor_sim
+      PROJECT_ID: demo
+      API_TOKEN: dev
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:
