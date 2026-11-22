@@ -4,12 +4,14 @@ Run from backend/:
     uv run python -m scripts.seed --reset              # wipe and backfill 90 days
     uv run python -m scripts.seed --reset --days 30
     uv run python -m scripts.seed --reset --method insert   # benchmark vs COPY
+    uv run python -m scripts.seed --reset --yes        # non-local DB (e.g. production)
 
 Readings come from app.simulator.generator.generate_day(): the same function the
 live worker uses, so backfilled history and live data line up exactly. After
 changing a model, re-run with --reset so history matches the new code.
 
 Without --reset the script refuses to touch a database that already has devices.
+--reset on anything other than localhost also needs --yes (see scripts/guards.py).
 """
 
 import argparse
@@ -21,11 +23,13 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func, insert, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db import SessionLocal, engine
 from app.models import Device, Reading, Sensor
 from app.simulator.catalog import CATALOG
 from app.simulator.clock import local_date
 from app.simulator.generator import generate_day
+from scripts.guards import describe_target, reset_refusal
 
 COLUMNS = ("sensor_id", "ts", "value", "quality")
 Row = tuple[int, datetime, float | None, str]
@@ -37,6 +41,11 @@ def parse_args() -> argparse.Namespace:
         "--days", type=int, default=90, help="local days to backfill (default 90)"
     )
     p.add_argument("--reset", action="store_true", help="TRUNCATE all tables first")
+    p.add_argument(
+        "--yes",
+        action="store_true",
+        help="confirm --reset on a non-local database (e.g. production)",
+    )
     p.add_argument(
         "--method",
         choices=("copy", "insert"),
@@ -104,6 +113,11 @@ def rows_for_day(ids: dict[str, int], day: date, until: datetime) -> list[Row]:
 
 async def main() -> int:
     args = parse_args()
+    database_url = get_settings().database_url
+    if args.reset and (refusal := reset_refusal(database_url, args.yes)):
+        print(refusal, file=sys.stderr)
+        return 2
+    print(f"target: {describe_target(database_url)}")
     write = copy_rows if args.method == "copy" else insert_rows
     now = datetime.now(UTC)
     today = local_date(now)
