@@ -1,0 +1,7 @@
+# Caddy gets and renews a Let's Encrypt certificate for $DOMAIN automatically
+# (the domain's DNS must point at this server, ports 80 and 443 open).
+# DOMAIN=localhost serves a locally trusted certificate, for testing.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy backend:8000
+}
